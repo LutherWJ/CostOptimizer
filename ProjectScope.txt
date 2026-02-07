@@ -1,0 +1,110 @@
+Optimal Resale Price Estimation
+
+LIMITS:
+	-Sell tech products at the start (laptops, Smartphones, tablets)
+
+	-Stick to historical transaction market data exclude external trend or sentiment signals
+	Exclude (for now):
+		-Desktops (custom builds break comparability)
+		-Wearables (low resale liquidity)
+		-Consoles (supply shocks dominate)
+		-Accessories as price fluctuates and is mostly likely bundled
+		
+	- No free-text conditions descriptions or images when identifying your object
+
+No photos
+POTENTIAL MARKETS
+ - eBay
+	Pros
+	- Explicit sold vs unsold
+	- large volumes of tech products
+	- Publicly accessible
+	- Timestamped prices
+	Extracted data
+	- Final sale price
+	- Listing start date -> sold date to find time-to-sell
+	- Item specs
+	- Condition
+	- Whether the listing expired
+	Concerns (Important)
+	- eBay prices include:
+	- Auction dynamics
+	- Seller reputation effects
+	- Shipping strategy effects
+
+ - Swappa (electronics only)
+	Pros
+	- clean structured data
+	- Honest condition reporting
+	- Less noise than eBay
+	Cons
+	- No unsold listings
+	- Prices skew higher
+	- Smaller volume
+	Extracted data
+	- Compare price distributions
+	- Detect systematic pricing bias from eBay
+	- Do not train probability-of-sale models on it alone
+- Amazon Renewed
+	Use only to 
+	- Establish an upper-bound reference point
+	- Sanity-check outliers
+	Do not treat as market-clearing
+	- Warranty + trust inflates prices
+	- Not a peer-to-peer Market
+
+AVOID
+	-Platforms where final transaction prices and failed sales are not observable like Facebook Marketplace, Craigslist
+	- Trade-in programs like Spple and Best Buy
+
+
+Proposed Data Strategy
+
+Train on
+- eBay sold + unsold listings
+
+Validate against
+- Swappa completed sales
+
+Reference only
+- Amazon Renewed
+
+
+Features
+	Input
+		- Identify the product so it can be matched to comparable historical sales.
+		- Condition modeling (tiered)
+		- Cosmetic conditions 
+		- Functional conditions (yes/no issues) button/keys work, screen has not tears, scratches etc
+		- Included accessories (yes/no)  charger, case etc
+		- Location context (zip code)
+	Internal
+		- Time to Sale vs Price Curve
+		- Predict the chance that a product will sell in a certain amount of time; e.g 30 days 60 days etc		
+	Output
+		- Dynamic Price Recommendation
+			- Fastest sell price
+			- Balance sell price
+			- Max sell price
+
+		- Price Breakdowns for users
+			-Base market price
+			-Condition adjustments
+			-Battery penalty
+			-Regional adjustment
+			-Show a range of price that could be sold e.g 600-700$
+	
+
+Concerns:
+- Depreciation and Trends
+	-Product lifecycle
+	-New models and releases
+	-End-of-support
+-Supply Shocks
+	used prices collapse when;
+	- Corporations dump fleets
+	- New models go on sale
+	- Refurb sellers flood listings
+Detect by
+	- Sudden listing volume spikes
+	- Median price drops week-over-week
