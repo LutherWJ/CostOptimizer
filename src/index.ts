@@ -1,12 +1,13 @@
-import express from "express";
+import { Hono } from "hono";
+import { getHome } from "./controllers/homeController";
 
-const app = express();
-const port = 8080;
+const app = new Hono();
 
-app.get("/health", (req, res) => {
-  res.json({ status: "ok", message: "Service is running" });
-});
+app.get("/", (c) => getHome(c));
 
-app.get("/", (req, res) => {
-  res.sendFile(path.join(__dirname, "../public", "index.html"));
-});
+const server = {
+  port: process.env.http_server_port || 8080,
+  fetch: app.fetch,
+};
+
+export default server;

@@ -1,16 +1,15 @@
 {
   "name": "costoptimizer",
   "module": "index.ts",
-  "type": "module",
-  "private": true,
   "devDependencies": {
     "@types/bun": "latest"
   },
   "peerDependencies": {
     "typescript": "^5"
   },
+  "private": true,
+  "type": "module",
   "dependencies": {
-    "express": "^5.2.1",
-    "htmx": "^0.0.2"
+    "hono": "^4.12.0"
   }
 }
