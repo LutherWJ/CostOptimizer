@@ -1,0 +1,51 @@
+services:
+  # 1. The Public Web Server (Bun/Hono)
+  web-app:
+    build: 
+      context: ./application
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      - DATABASE_URL=postgres://postgres:password@postgres-db:5432/laptop_db
+    depends_on:
+      - postgres-db
+
+  # 2. The Data Aggregator / ETL Worker (Bun + Crawlee)
+  aggregator-service:
+    build:
+      context: ./aggregator
+      dockerfile: Dockerfile
+    environment:
+      - DATABASE_URL=postgres://postgres:password@postgres-db:5432/laptop_db
+      - LLM_API_URL=http://llm-server:11434/api/generate
+    depends_on:
+      - postgres-db
+      - llm-server
+
+  # 3. The PostgreSQL Database
+  postgres-db:
+    image: postgres:16-alpine
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=password
+      - POSTGRES_DB=laptop_db
+    ports:
+      - "5432:5432" # Expose to your host machine for data inspection tools like DBeaver
+    volumes:
+      - pg-data:/var/lib/postgresql/data # Persists the database data
+      - ./postgres:/docker-entrypoint-initdb.d # Auto-runs your schema on first boot
+
+  # 4. The LLM Server (Ollama)
+  llm-server:
+    image: ollama/ollama:latest
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama-models:/root/.ollama # Prevents re-downloading the model on every restart
+    # Since you lack GPU compute, we omit the 'deploy: resources: reservations: devices' block. 
+    # Ollama will automatically default to standard CPU inference.
+
+volumes:
+  pg-data:
+  ollama-models:

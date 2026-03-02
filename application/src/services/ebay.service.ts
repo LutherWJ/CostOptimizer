@@ -1,6 +1,7 @@
 import { EbayFilters, EbaySearchResponse } from "../types";
+import { IEbayService } from "../core/interfaces/IEbayService";
 
-export class EbayService {
+export class EbayService implements IEbayService {
   private clientId: string;
   private clientSecret: string;
   private baseUrl = "https://api.ebay.com";

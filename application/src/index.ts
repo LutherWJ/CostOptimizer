@@ -6,7 +6,7 @@ const app = new Hono();
 app.get("/", (c) => getHome(c));
 
 const server = {
-  port: process.env.http_server_port || 8080,
+  port: process.env.http_server_port || 8081,
   fetch: app.fetch,
 };
 
