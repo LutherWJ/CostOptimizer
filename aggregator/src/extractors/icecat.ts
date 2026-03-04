@@ -1,5 +1,5 @@
 import { HardwareSpecs } from "../models/hardwareSpecsSchema";
-import { IIcecatService, IcecatProductResponse } from "../core/interfaces/IIcecatService";
+import { IIcecatService, IcecatProductResponse } from "../types";
 
 interface FeatureDetail {
   value: string;

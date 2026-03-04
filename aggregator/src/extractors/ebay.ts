@@ -1,5 +1,4 @@
-import { EbayFilters, EbaySearchResponse } from "../types";
-import { IEbayService } from "../core/interfaces/IEbayService";
+import { EbayFilters, EbaySearchResponse, IEbayService } from "../types";
 
 export class EbayService implements IEbayService {
   private clientId: string;
