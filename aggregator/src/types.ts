@@ -40,7 +40,19 @@ export interface EbayItemSummary {
   }[];
 }
 
-export interface IEbayService {
+export interface PriceResult {
+  vendor: string;
+  price_usd: number;
+  purchase_url: string;
+  is_refurbished: boolean;
+}
+
+export interface IPriceProvider {
+  vendorName: string;
+  getLatestPrice(brand: string, sku: string): Promise<PriceResult | null>;
+}
+
+export interface IEbayService extends IPriceProvider {
   search(q: string): Promise<EbaySearchResponse>;
   searchWithFilters(filters: EbayFilters): Promise<EbaySearchResponse>;
 }
@@ -84,7 +96,7 @@ export interface IcecatIndexItem {
 }
 
 export interface IIcecatService {
-  getProductSpecs(brand: string, sku: string): Promise<HardwareSpecs | null>;
-  getRawProductData(brand: string, sku: string): Promise<IcecatProductResponse | null>;
-  getDiscoveryIndex(limit?: number): Promise<IcecatIndexItem[]>;
+  getProductSpecs(brand: string, sku: string, icecatId?: string): Promise<HardwareSpecs | null>;
+  getRawProductData(brand: string, sku: string, icecatId?: string): Promise<IcecatProductResponse | null>;
+  getDiscoveryIndex(sinceDate: Date, limit?: number): Promise<IcecatIndexItem[]>;
 }

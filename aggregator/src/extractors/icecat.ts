@@ -1,5 +1,10 @@
-import { HardwareSpecs } from "../models/hardwareSpecsSchema";
-import { IIcecatService, IcecatProductResponse, IcecatIndexItem } from "../types";
+import { XMLParser } from "fast-xml-parser";
+import type { HardwareSpecs } from "../models/hardwareSpecsSchema";
+import type {
+  IIcecatService,
+  IcecatProductResponse,
+  IcecatIndexItem,
+} from "../types";
 
 interface FeatureDetail {
   value: string;
@@ -11,66 +16,129 @@ export class IcecatService implements IIcecatService {
   private apiToken: string;
   private shopName: string;
   private appKey: string;
+  private username: string;
+  private password: string;
   private baseUrl = "https://live.icecat.biz/api";
+  private parser = new XMLParser({
+    ignoreAttributes: false,
+    attributeNamePrefix: "",
+  });
 
   constructor() {
     this.apiToken = (process.env.ICECAT_ACCESS_TOKEN || "").trim();
-    this.shopName = (process.env.ICECAT_SHOP_NAME || "").trim();
+    this.shopName = (process.env.ICECAT_SHOP_NAME || process.env.ICECAT_USER || "").trim();
     this.appKey = (process.env.ICECAT_APP_KEY || "").trim();
+    this.username = (process.env.ICECAT_USER || "").trim();
+    this.password = (process.env.ICECAT_PASSWORD || "").trim();
 
     if (!this.apiToken) {
-      console.warn("Icecat API token not found in environment variables.");
+      console.warn("Warning: ICECAT_ACCESS_TOKEN not found.");
     }
   }
 
-  /**
-   * Discovers product SKUs using Icecat's category-specific CSV export.
-   * Laptops = Category 151.
-   */
-  async getDiscoveryIndex(limit: number = 100): Promise<IcecatIndexItem[]> {
-    // For Open Icecat, we can use the daily updated CSV for category 151
-    const csvUrl = `https://data.icecat.biz/export/freecsv.pkg/en/151.csv`;
+  async getDiscoveryIndex(sinceDate: Date, limit?: number): Promise<IcecatIndexItem[]> {
+    const indexUrl = `https://data.icecat.biz/export/freexml.int/INT/files.index.xml.gz`;
     
+    if (!this.username || !this.password) {
+      console.error("CRITICAL: ICECAT_USER or ICECAT_PASSWORD is not set.");
+      return [];
+    }
+
     try {
-      const response = await fetch(csvUrl);
+      const auth = Buffer.from(`${this.username}:${this.password}`).toString("base64");
+      console.log(`Downloading and parsing Full Icecat Index (Since: ${sinceDate.getFullYear()})...`);
+      
+      const response = await fetch(indexUrl, {
+        headers: { "Authorization": `Basic ${auth}` }
+      });
+
       if (!response.ok) {
-        throw new Error(`Failed to fetch Icecat index: ${response.statusText}`);
+        throw new Error(`Icecat Index Fetch Failed: ${response.statusText} (${response.status})`);
       }
 
-      const text = await response.text();
-      const lines = text.split("\n");
+      const stream = response.body?.pipeThrough(new DecompressionStream("gzip"));
+      if (!stream) throw new Error("Failed to initialize decompression stream");
+
+      const reader = stream.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
       const items: IcecatIndexItem[] = [];
 
-      for (let i = 1; i < lines.length && items.length < limit; i++) {
-        const line = lines[i]?.trim();
-        if (!line) continue;
+      const fileTagRegex = /<file\s+([^>]+)\/>/gi;
+      let totalTagsProcessed = 0;
 
-        // Icecat CSVs in the free package are often tab or semicolon separated.
-        const parts = line.includes("\t") ? line.split("\t") : line.split(";");
-        if (parts.length < 3) continue;
+      let lastMatchEnd = 0;
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
 
-        items.push({
-          icecatId: parts[0]!.replace(/"/g, ""),
-          brand: parts[1]!.replace(/"/g, ""),
-          sku: parts[2]!.replace(/"/g, ""),
-          ean: parts[3]?.replace(/"/g, ""),
-        });
+        buffer += decoder.decode(value, { stream: true });
+        
+        let match;
+        fileTagRegex.lastIndex = 0; 
+        
+        while ((match = fileTagRegex.exec(buffer)) !== null) {
+          totalTagsProcessed++;
+          lastMatchEnd = fileTagRegex.lastIndex;
+
+          const tagString = match[0];
+          
+          // Use fast-xml-parser for the individual tag
+          const parsedTag = this.parser.parse(tagString);
+          const fileAttrs = parsedTag.file;
+
+          if (!fileAttrs) continue;
+
+          if (totalTagsProcessed % 250000 === 0) {
+             console.log(`Progress: Searched ${totalTagsProcessed} tags...`);
+          }
+
+          // Note: Icecat XML uses Capitalized Attributes (Catid, Prod_ID, etc.)
+          const catId = String(fileAttrs.Catid || fileAttrs.catid || fileAttrs.category_id || "");
+          if (catId !== "151") continue;
+
+          // Check date (YYYYMMDDHHMMSS)
+          const updatedStr = String(fileAttrs.Updated || fileAttrs.updated || "");
+          if (updatedStr) {
+            const updatedYear = parseInt(updatedStr.substring(0, 4));
+            if (updatedYear < sinceDate.getFullYear()) continue;
+          }
+
+          const icecatId = String(fileAttrs.Product_ID || fileAttrs.product_id || "");
+          const brand = String(fileAttrs.Supplier_name || fileAttrs.supplier_name || ""); // Often missing in index
+          const sku = String(fileAttrs.Prod_ID || fileAttrs.prod_id || "");
+
+          if (icecatId && sku) {
+            items.push({ icecatId, brand, sku });
+          }
+
+          if (limit && items.length >= limit) break;
+        }
+
+        if (limit && items.length >= limit) break;
+        
+        buffer = buffer.slice(lastMatchEnd);
+        lastMatchEnd = 0;
+        fileTagRegex.lastIndex = 0;
       }
 
+      console.log(`Parsed ${totalTagsProcessed} total tags. Found ${items.length} matching laptops.`);
       return items;
     } catch (error) {
-      console.error("Error fetching Icecat discovery index:", error);
+      console.error("Error fetching Icecat discovery index:", error instanceof Error ? error.message : error);
       return [];
     }
   }
 
-  async getRawProductData(brand: string, sku: string): Promise<IcecatProductResponse | null> {
-    const params = new URLSearchParams({
-      lang: "en",
-      shopname: this.shopName,
-      Brand: brand,
-      ProductCode: sku,
-    });
+  async getRawProductData(brand: string, sku: string, icecatId?: string): Promise<IcecatProductResponse | null> {
+    const params = new URLSearchParams({ lang: "en", shopname: this.shopName });
+
+    if (icecatId) {
+      params.append("icecat_id", icecatId);
+    } else {
+      params.append("Brand", brand);
+      params.append("ProductCode", sku);
+    }
 
     if (this.appKey) {
       params.append("app_key", this.appKey);
@@ -90,37 +158,33 @@ export class IcecatService implements IIcecatService {
       if (!response.ok) {
         if (response.status === 404) return null;
         const errorBody = await response.text();
-        console.error(`Icecat API Error Status: ${response.status}`, errorBody);
+        console.error(`Icecat Live API Error (ID: ${icecatId || (brand + ' ' + sku)}): ${response.status}`, errorBody);
         return null;
       }
 
       return await response.json() as IcecatProductResponse;
     } catch (error) {
-      console.error(`Failed to fetch from Icecat for ${brand} ${sku}:`, error);
+      console.error(`Failed to fetch from Icecat for ID: ${icecatId || (brand + ' ' + sku)}:`, error);
       return null;
     }
   }
 
-  async getProductSpecs(brand: string, sku: string): Promise<HardwareSpecs | null> {
-    const rawData = await this.getRawProductData(brand, sku);
+  async getProductSpecs(brand: string, sku: string, icecatId?: string): Promise<HardwareSpecs | null> {
+    const rawData = await this.getRawProductData(brand, sku, icecatId);
     if (!rawData || !rawData.data) return null;
-
     return this.mapIcecatToHardwareSpecs(rawData);
   }
 
   private mapIcecatToHardwareSpecs(data: IcecatProductResponse): HardwareSpecs {
     const features = this.flattenFeatures(data);
 
-    // Parse Display Size
     let screen_size = this.parseNumeric(features["Display diagonal"]);
     if (features["Display diagonal"]?.unit === "cm" && screen_size) {
       screen_size = screen_size / 2.54;
     } else if (screen_size && screen_size > 25) {
-      // Fallback: If it's > 25 and no unit, it's almost certainly CM
       screen_size = screen_size / 2.54;
     }
 
-    // Parse Weight (Standardize to LBS)
     let weight_lbs = undefined;
     const weightVal = this.parseNumeric(features["Weight"]);
     if (weightVal) {
@@ -128,19 +192,17 @@ export class IcecatService implements IIcecatService {
       if (unit === "g") {
         weight_lbs = (weightVal / 453.592);
       } else if (unit === "kg" || (weightVal > 100)) { 
-        // If it's labeled kg, or it's > 100 (likely grams unlabeled), handle accordingly
-        if (weightVal > 100) { // Assume grams if no unit and high number
+        if (weightVal > 100) {
            weight_lbs = (weightVal / 453.592);
         } else {
            weight_lbs = (weightVal * 2.20462);
         }
       } else {
-        // Default to kg for small numbers
         weight_lbs = (weightVal * 2.20462);
       }
     }
 
-    return {
+    const specs: HardwareSpecs = {
       cpu_family: features["Processor family"]?.value || features["Processor model"]?.value || "Unknown",
       cpu_cores: this.parseNumeric(features["Processor cores"]),
       ram_gb: this.parseNumeric(features["Internal memory"]),
@@ -159,16 +221,21 @@ export class IcecatService implements IIcecatService {
       battery_wh: this.parseNumeric(features["Battery capacity (Watt-hours)"]),
       weight_lbs: weight_lbs ? parseFloat(weight_lbs.toFixed(2)) : undefined,
     };
+
+    (specs as any)._brandName = data.data.GeneralInfo.Brand;
+    
+    return specs;
   }
 
   private flattenFeatures(data: IcecatProductResponse): Record<string, FeatureDetail> {
     const flattened: Record<string, FeatureDetail> = {};
+    if (!data.data.FeaturesGroups) return flattened;
+
     data.data.FeaturesGroups.forEach(group => {
       group.Features.forEach(feature => {
         const key = feature.Feature.Name.Value;
         flattened[key] = {
           value: feature.PresentationValue,
-          // Use RawValue but fallback to parsing PresentationValue if RawValue is misleading (like 1 for 1TB)
           rawValue: feature.RawValue,
           unit: feature.Feature.Measure?.Sign || "",
         };
@@ -179,9 +246,6 @@ export class IcecatService implements IIcecatService {
 
   private parseNumeric(detail?: FeatureDetail): number | undefined {
     if (!detail) return undefined;
-    
-    // If rawValue is 1 but presentation says 1000 or 512, rawValue is likely in TB/GB mixed.
-    // We prefer the number from PresentationValue for consistency in these cases.
     const presentationNum = parseFloat(detail.value);
     const rawNum = typeof detail.rawValue === "number" ? detail.rawValue : parseFloat(detail.rawValue);
 

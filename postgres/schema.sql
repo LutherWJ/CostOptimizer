@@ -1,18 +1,14 @@
--- 1. Product Lines (The Chassis & Subjective Qualities)
--- This table handles brand-wide and line-wide qualities (e.g., "ThinkPad reliability")
+-- Product Lines 
 CREATE TABLE product_lines (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     manufacturer VARCHAR(100) NOT NULL,
     line_name VARCHAR(100) NOT NULL, 
-    llm_aggregated_scores JSONB, -- Aggregated scores from all scrapes
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     UNIQUE (manufacturer, line_name)
 );
 
-CREATE INDEX idx_product_lines_scores ON product_lines USING GIN (llm_aggregated_scores);
-
--- 2. Specific SKUs (The Hardware & Objective Capabilities)
+-- Specific SKUs 
 CREATE TABLE laptop_skus (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     product_line_id UUID REFERENCES product_lines(id) ON DELETE CASCADE,
@@ -24,7 +20,7 @@ CREATE TABLE laptop_skus (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
--- 3. Workload Requirements (The Bare Minimums)
+-- Workload Requirements (The Bare Minimums)
 CREATE TABLE workload_requirements (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     workload_name VARCHAR(50) UNIQUE NOT NULL, -- e.g., 'web_browsing', 'video_editing'
@@ -33,15 +29,13 @@ CREATE TABLE workload_requirements (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
--- 4. SKU Suitability (The Binary Map)
--- This table is populated by the ETL pipeline based on workload_requirements
+-- Maps laptop models to workloads they've been deemed suitable for
 CREATE TABLE sku_suitability (
     sku_id UUID REFERENCES laptop_skus(id) ON DELETE CASCADE,
     workload_id UUID REFERENCES workload_requirements(id) ON DELETE CASCADE,
     PRIMARY KEY (sku_id, workload_id)
 );
 
--- 5. Price History
 -- An append-only table to track price fluctuations over time.
 CREATE TABLE price_history (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -53,7 +47,7 @@ CREATE TABLE price_history (
     recorded_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
--- 6. Raw Scrapes 
+-- Stores unprocessed text data from scraped review sites
 CREATE TABLE raw_scrapes (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     product_line_id UUID REFERENCES product_lines(id) ON DELETE SET NULL,
@@ -113,7 +107,6 @@ SELECT
     ls.sku_number,
     ls.hardware_specs,
     ls.qualitative_data,
-    pl.llm_aggregated_scores as line_scores,
     COALESCE(sa.workloads, '[]'::jsonb) as suitable_workloads,
     bd.price_usd as current_price,
     bd.vendor as best_vendor,
@@ -123,7 +116,7 @@ SELECT
 FROM laptop_skus ls
 JOIN product_lines pl ON ls.product_line_id = pl.id
 LEFT JOIN suitability_agg sa ON ls.id = sa.sku_id
-JOIN best_deals bd ON ls.id = bd.laptop_sku_id -- Changed to JOIN to ensure we only show laptops with active prices
+JOIN best_deals bd ON ls.id = bd.laptop_sku_id
 WHERE ls.is_active = TRUE;
 
 CREATE INDEX idx_rec_workloads ON laptop_recommendations USING GIN (suitable_workloads);

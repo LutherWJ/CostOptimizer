@@ -1,5 +1,5 @@
 import { db } from "./connection";
-import { HardwareSpecs } from "../models/hardwareSpecsSchema";
+import type { HardwareSpecs } from "../models/hardwareSpecsSchema";
 
 export interface LaptopSku {
   id: string;
@@ -16,7 +16,7 @@ export class LaptopSkuRepository {
     productLineId: string,
     skuNumber: string,
     hardwareSpecs: HardwareSpecs,
-    qualitativeData?: any
+    qualitativeData?: any,
   ): Promise<string> {
     const result = await db`
       INSERT INTO laptop_skus (product_line_id, sku_number, hardware_specs, qualitative_data)
