@@ -76,7 +76,15 @@ export interface IcecatProductResponse {
   };
 }
 
+export interface IcecatIndexItem {
+  icecatId: string;
+  brand: string;
+  sku: string;
+  ean?: string;
+}
+
 export interface IIcecatService {
   getProductSpecs(brand: string, sku: string): Promise<HardwareSpecs | null>;
   getRawProductData(brand: string, sku: string): Promise<IcecatProductResponse | null>;
+  getDiscoveryIndex(limit?: number): Promise<IcecatIndexItem[]>;
 }

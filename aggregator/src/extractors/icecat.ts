@@ -1,5 +1,5 @@
 import { HardwareSpecs } from "../models/hardwareSpecsSchema";
-import { IIcecatService, IcecatProductResponse } from "../types";
+import { IIcecatService, IcecatProductResponse, IcecatIndexItem } from "../types";
 
 interface FeatureDetail {
   value: string;
@@ -20,6 +20,47 @@ export class IcecatService implements IIcecatService {
 
     if (!this.apiToken) {
       console.warn("Icecat API token not found in environment variables.");
+    }
+  }
+
+  /**
+   * Discovers product SKUs using Icecat's category-specific CSV export.
+   * Laptops = Category 151.
+   */
+  async getDiscoveryIndex(limit: number = 100): Promise<IcecatIndexItem[]> {
+    // For Open Icecat, we can use the daily updated CSV for category 151
+    const csvUrl = `https://data.icecat.biz/export/freecsv.pkg/en/151.csv`;
+    
+    try {
+      const response = await fetch(csvUrl);
+      if (!response.ok) {
+        throw new Error(`Failed to fetch Icecat index: ${response.statusText}`);
+      }
+
+      const text = await response.text();
+      const lines = text.split("\n");
+      const items: IcecatIndexItem[] = [];
+
+      for (let i = 1; i < lines.length && items.length < limit; i++) {
+        const line = lines[i]?.trim();
+        if (!line) continue;
+
+        // Icecat CSVs in the free package are often tab or semicolon separated.
+        const parts = line.includes("\t") ? line.split("\t") : line.split(";");
+        if (parts.length < 3) continue;
+
+        items.push({
+          icecatId: parts[0]!.replace(/"/g, ""),
+          brand: parts[1]!.replace(/"/g, ""),
+          sku: parts[2]!.replace(/"/g, ""),
+          ean: parts[3]?.replace(/"/g, ""),
+        });
+      }
+
+      return items;
+    } catch (error) {
+      console.error("Error fetching Icecat discovery index:", error);
+      return [];
     }
   }
 

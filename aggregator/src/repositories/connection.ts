@@ -1,4 +1,4 @@
-import { sql, SQL } from "bun";
+import { SQL } from "bun";
 
 export const db = new SQL({
   username: process.env.POSTGRES_USER || "postgres",
