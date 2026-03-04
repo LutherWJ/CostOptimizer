@@ -4,7 +4,6 @@ CREATE TABLE product_lines (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     manufacturer VARCHAR(100) NOT NULL,
     line_name VARCHAR(100) NOT NULL, 
-    llm_aggregated_scores JSONB, -- e.g., '{"build_quality": 8.5, "keyboard_feel": 9.0}'
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     UNIQUE (manufacturer, line_name)
