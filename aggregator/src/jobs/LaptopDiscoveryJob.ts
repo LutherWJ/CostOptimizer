@@ -27,48 +27,51 @@ export class LaptopDiscoveryJob {
     let processedCount = 0;
     let invalidSpecsCount = 0;
 
-    for (const item of index) {
-      processedCount++;
-      try {
-        const existingSku = await this.skuRepo.findBySkuNumber(item.sku);
-        if (existingSku) {
-          skipCount++;
-          if (processedCount % 1000 === 0) {
-            console.log(`Progress: Processed ${processedCount}/${index.length} items...`);
+    const concurrency = 5;
+    const chunks = [];
+    for (let i = 0; i < index.length; i += concurrency) {
+      chunks.push(index.slice(i, i + concurrency));
+    }
+
+    for (const chunk of chunks) {
+      await Promise.all(chunk.map(async (item) => {
+        processedCount++;
+        try {
+          const existingSku = await this.skuRepo.findBySkuNumber(item.sku);
+          if (existingSku) {
+            skipCount++;
+            return; 
           }
-          continue; 
-        }
 
-        const specs = await this.icecat.getProductSpecs(item.brand, item.sku, item.icecatId);
-        
-        if (!specs) {
-          console.warn(`Could not find detailed specs for ID: ${item.icecatId} (${item.brand} ${item.sku})`);
-          continue;
-        }
-
-        // Validate specs against schema
-        const validation = hardwareSpecsSchema.safeParse(specs);
-        if (!validation.success) {
-          invalidSpecsCount++;
-          if (invalidSpecsCount % 100 === 0 || index.length < 1000) {
-             // console.warn(`Invalid specs for SKU ${item.sku}:`, validation.error.format());
+          const specs = await this.icecat.getProductSpecs(item.brand, item.sku, item.icecatId);
+          
+          if (!specs) {
+            // console.warn(`Could not find detailed specs for ID: ${item.icecatId} (${item.brand} ${item.sku})`);
+            return;
           }
-          continue;
+
+          // Validate specs against schema
+          const validation = hardwareSpecsSchema.safeParse(specs);
+          if (!validation.success) {
+            invalidSpecsCount++;
+            return;
+          }
+
+          const brandName = item.brand || (specs as any)._brandName || "Unknown";
+          const lineId = await this.lineRepo.upsert(brandName, brandName);
+          await this.skuRepo.upsert(lineId, item.sku, specs);
+          
+          newItemsCount++;
+          console.log(`[${newItemsCount}] Imported ${brandName} ${item.sku}`);
+
+        } catch (err) {
+          console.error(`Failed to process ${item.brand} ${item.sku}:`, err);
+          errorCount++;
         }
+      }));
 
-        const brandName = item.brand || (specs as any)._brandName || "Unknown";
-        const lineId = await this.lineRepo.upsert(brandName, brandName);
-        await this.skuRepo.upsert(lineId, item.sku, specs);
-        
-        newItemsCount++;
-        console.log(`[${newItemsCount}] Imported ${brandName} ${item.sku}`);
-
-        // Rate limiting to be polite
-        await new Promise(resolve => setTimeout(resolve, 500));
-
-      } catch (err) {
-        console.error(`Failed to process ${item.brand} ${item.sku}:`, err);
-        errorCount++;
+      if (processedCount % 100 === 0 || processedCount >= index.length) {
+         console.log(`Progress: Processed ${processedCount}/${index.length} items...`);
       }
     }
 
