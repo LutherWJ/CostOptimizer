@@ -3,6 +3,7 @@ import {
   LaptopSkuRepository, 
   ProductLineRepository 
 } from "../repositories";
+import hardwareSpecsSchema from "../models/hardwareSpecsSchema";
 
 export class LaptopDiscoveryJob {
   constructor(
@@ -24,6 +25,7 @@ export class LaptopDiscoveryJob {
     let skipCount = 0;
     let errorCount = 0;
     let processedCount = 0;
+    let invalidSpecsCount = 0;
 
     for (const item of index) {
       processedCount++;
@@ -41,6 +43,16 @@ export class LaptopDiscoveryJob {
         
         if (!specs) {
           console.warn(`Could not find detailed specs for ID: ${item.icecatId} (${item.brand} ${item.sku})`);
+          continue;
+        }
+
+        // Validate specs against schema
+        const validation = hardwareSpecsSchema.safeParse(specs);
+        if (!validation.success) {
+          invalidSpecsCount++;
+          if (invalidSpecsCount % 100 === 0 || index.length < 1000) {
+             // console.warn(`Invalid specs for SKU ${item.sku}:`, validation.error.format());
+          }
           continue;
         }
 
@@ -62,7 +74,8 @@ export class LaptopDiscoveryJob {
 
     console.log(`Discovery Job Finished.`);
     console.log(`- New Items: ${newItemsCount}`);
-    console.log(`- Skipped: ${skipCount}`);
+    console.log(`- Invalid Specs (Skipped): ${invalidSpecsCount}`);
+    console.log(`- Already Exist (Skipped): ${skipCount}`);
     console.log(`- Errors: ${errorCount}`);
   }
 }
