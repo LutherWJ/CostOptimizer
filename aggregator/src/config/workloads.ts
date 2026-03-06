@@ -1,5 +1,3 @@
-import { HardwareSpecs } from "../models/hardwareSpecsSchema";
-
 export interface WorkloadRequirement {
   name: string;
   description: string;
@@ -16,7 +14,8 @@ export interface WorkloadRequirement {
 export const WORKLOAD_DEFINITIONS: WorkloadRequirement[] = [
   {
     name: "Simple Web Browsing",
-    description: "Perfect for students or office work. Handles tabs, emails, and video calls.",
+    description:
+      "Perfect for students or office work. Handles tabs, emails, and video calls.",
     min_specs: {
       ram_gb: 8,
       storage_gb: 256,
@@ -25,7 +24,8 @@ export const WORKLOAD_DEFINITIONS: WorkloadRequirement[] = [
   },
   {
     name: "Photo Editing",
-    description: "Designed for photographers using Lightroom or Photoshop. Prioritizes RAM and Screen Quality.",
+    description:
+      "Designed for photographers using Lightroom or Photoshop. Prioritizes RAM and Screen Quality.",
     min_specs: {
       ram_gb: 16,
       storage_gb: 512,
@@ -34,7 +34,8 @@ export const WORKLOAD_DEFINITIONS: WorkloadRequirement[] = [
   },
   {
     name: "3D Modeling & Gaming",
-    description: "High-performance workload for Blender, CAD, or modern AAA games.",
+    description:
+      "High-performance workload for Blender, CAD, or modern AAA games.",
     min_specs: {
       ram_gb: 16,
       cpu_cores: 8,

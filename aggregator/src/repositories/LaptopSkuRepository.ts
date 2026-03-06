@@ -11,6 +11,11 @@ export interface LaptopSku {
   created_at: Date;
 }
 
+export interface LaptopSkuWithBenchmarks extends LaptopSku {
+  cpu_benchmark_score?: number;
+  gpu_benchmark_score?: number;
+}
+
 export class LaptopSkuRepository {
   async upsert(
     productLineId: string,
@@ -60,5 +65,27 @@ export class LaptopSkuRepository {
       SELECT * FROM laptop_skus WHERE is_active = TRUE
     `;
     return result as unknown as LaptopSku[];
+  }
+
+  /**
+   * Fetches all active SKUs along with their corresponding CPU and GPU benchmark scores
+   * by joining the hardware_specs JSONB fields against the component_benchmarks table.
+   */
+  async findAllWithBenchmarks(): Promise<LaptopSkuWithBenchmarks[]> {
+    const result = await db`
+      SELECT 
+        ls.*,
+        cpu.benchmark_score as cpu_benchmark_score,
+        gpu.benchmark_score as gpu_benchmark_score
+      FROM laptop_skus ls
+      -- Join for CPU
+      LEFT JOIN component_aliases ca_cpu ON ca_cpu.alias_name = ls.hardware_specs->>'cpu_family'
+      LEFT JOIN component_benchmarks cpu ON cpu.component_name = COALESCE(ca_cpu.canonical_name, ls.hardware_specs->>'cpu_family')
+      -- Join for GPU
+      LEFT JOIN component_aliases ca_gpu ON ca_gpu.alias_name = ls.hardware_specs->>'gpu_model'
+      LEFT JOIN component_benchmarks gpu ON gpu.component_name = COALESCE(ca_gpu.canonical_name, ls.hardware_specs->>'gpu_model')
+      WHERE ls.is_active = TRUE;
+    `;
+    return result as unknown as LaptopSkuWithBenchmarks[];
   }
 }

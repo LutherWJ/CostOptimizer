@@ -26,7 +26,11 @@ export class IcecatService implements IIcecatService {
 
   constructor() {
     this.apiToken = (process.env.ICECAT_ACCESS_TOKEN || "").trim();
-    this.shopName = (process.env.ICECAT_SHOP_NAME || process.env.ICECAT_USER || "").trim();
+    this.shopName = (
+      process.env.ICECAT_SHOP_NAME ||
+      process.env.ICECAT_USER ||
+      ""
+    ).trim();
     this.appKey = (process.env.ICECAT_APP_KEY || "").trim();
     this.username = (process.env.ICECAT_USER || "").trim();
     this.password = (process.env.ICECAT_PASSWORD || "").trim();
@@ -36,27 +40,38 @@ export class IcecatService implements IIcecatService {
     }
   }
 
-  async getDiscoveryIndex(sinceDate: Date, limit?: number): Promise<IcecatIndexItem[]> {
+  async getDiscoveryIndex(
+    sinceDate: Date,
+    limit?: number,
+  ): Promise<IcecatIndexItem[]> {
     const indexUrl = `https://data.icecat.biz/export/freexml.int/INT/files.index.xml.gz`;
-    
+
     if (!this.username || !this.password) {
       console.error("CRITICAL: ICECAT_USER or ICECAT_PASSWORD is not set.");
       return [];
     }
 
     try {
-      const auth = Buffer.from(`${this.username}:${this.password}`).toString("base64");
-      console.log(`Downloading and parsing Full Icecat Index (Since: ${sinceDate.getFullYear()})...`);
-      
+      const auth = Buffer.from(`${this.username}:${this.password}`).toString(
+        "base64",
+      );
+      console.log(
+        `Downloading and parsing Full Icecat Index (Since: ${sinceDate.getFullYear()})...`,
+      );
+
       const response = await fetch(indexUrl, {
-        headers: { "Authorization": `Basic ${auth}` }
+        headers: { Authorization: `Basic ${auth}` },
       });
 
       if (!response.ok) {
-        throw new Error(`Icecat Index Fetch Failed: ${response.statusText} (${response.status})`);
+        throw new Error(
+          `Icecat Index Fetch Failed: ${response.statusText} (${response.status})`,
+        );
       }
 
-      const stream = response.body?.pipeThrough(new DecompressionStream("gzip"));
+      const stream = response.body?.pipeThrough(
+        new DecompressionStream("gzip"),
+      );
       if (!stream) throw new Error("Failed to initialize decompression stream");
 
       const reader = stream.getReader();
@@ -73,39 +88,46 @@ export class IcecatService implements IIcecatService {
         if (done) break;
 
         buffer += decoder.decode(value, { stream: true });
-        
+
         let match;
-        fileTagRegex.lastIndex = 0; 
-        
+        fileTagRegex.lastIndex = 0;
+
         while ((match = fileTagRegex.exec(buffer)) !== null) {
           totalTagsProcessed++;
           lastMatchEnd = fileTagRegex.lastIndex;
 
           const tagString = match[0];
-          
-          // Use fast-xml-parser for the individual tag
+
           const parsedTag = this.parser.parse(tagString);
           const fileAttrs = parsedTag.file;
 
           if (!fileAttrs) continue;
 
           if (totalTagsProcessed % 250000 === 0) {
-             console.log(`Progress: Searched ${totalTagsProcessed} tags...`);
+            console.log(`Progress: Searched ${totalTagsProcessed} tags...`);
           }
 
           // Note: Icecat XML uses Capitalized Attributes (Catid, Prod_ID, etc.)
-          const catId = String(fileAttrs.Catid || fileAttrs.catid || fileAttrs.category_id || "");
+          const catId = String(
+            fileAttrs.Catid || fileAttrs.catid || fileAttrs.category_id || "",
+          );
           if (catId !== "151") continue;
 
           // Check date (YYYYMMDDHHMMSS)
-          const updatedStr = String(fileAttrs.Updated || fileAttrs.updated || "");
+          const updatedStr = String(
+            fileAttrs.Updated || fileAttrs.updated || "",
+          );
           if (updatedStr) {
             const updatedYear = parseInt(updatedStr.substring(0, 4));
             if (updatedYear < sinceDate.getFullYear()) continue;
           }
 
-          const icecatId = String(fileAttrs.Product_ID || fileAttrs.product_id || "");
-          const brand = String(fileAttrs.Supplier_name || fileAttrs.supplier_name || ""); // Often missing in index
+          const icecatId = String(
+            fileAttrs.Product_ID || fileAttrs.product_id || "",
+          );
+          const brand = String(
+            fileAttrs.Supplier_name || fileAttrs.supplier_name || "",
+          ); // Often missing in index
           const sku = String(fileAttrs.Prod_ID || fileAttrs.prod_id || "");
 
           if (icecatId && sku) {
@@ -116,21 +138,30 @@ export class IcecatService implements IIcecatService {
         }
 
         if (limit && items.length >= limit) break;
-        
+
         buffer = buffer.slice(lastMatchEnd);
         lastMatchEnd = 0;
         fileTagRegex.lastIndex = 0;
       }
 
-      console.log(`Parsed ${totalTagsProcessed} total tags. Found ${items.length} matching laptops.`);
+      console.log(
+        `Parsed ${totalTagsProcessed} total tags. Found ${items.length} matching laptops.`,
+      );
       return items;
     } catch (error) {
-      console.error("Error fetching Icecat discovery index:", error instanceof Error ? error.message : error);
+      console.error(
+        "Error fetching Icecat discovery index:",
+        error instanceof Error ? error.message : error,
+      );
       return [];
     }
   }
 
-  async getRawProductData(brand: string, sku: string, icecatId?: string): Promise<IcecatProductResponse | null> {
+  async getRawProductData(
+    brand: string,
+    sku: string,
+    icecatId?: string,
+  ): Promise<IcecatProductResponse | null> {
     const params = new URLSearchParams({ lang: "en", shopname: this.shopName });
 
     if (icecatId) {
@@ -150,7 +181,7 @@ export class IcecatService implements IIcecatService {
       const url = `${this.baseUrl}?${params.toString()}`;
       const response = await fetch(url, {
         headers: {
-          "api_token": this.apiToken,
+          api_token: this.apiToken,
           "Content-Type": "application/json",
         },
       });
@@ -158,18 +189,28 @@ export class IcecatService implements IIcecatService {
       if (!response.ok) {
         if (response.status === 404) return null;
         const errorBody = await response.text();
-        console.error(`Icecat Live API Error (ID: ${icecatId || (brand + ' ' + sku)}): ${response.status}`, errorBody);
+        console.error(
+          `Icecat Live API Error (ID: ${icecatId || brand + " " + sku}): ${response.status}`,
+          errorBody,
+        );
         return null;
       }
 
-      return await response.json() as IcecatProductResponse;
+      return (await response.json()) as IcecatProductResponse;
     } catch (error) {
-      console.error(`Failed to fetch from Icecat for ID: ${icecatId || (brand + ' ' + sku)}:`, error);
+      console.error(
+        `Failed to fetch from Icecat for ID: ${icecatId || brand + " " + sku}:`,
+        error,
+      );
       return null;
     }
   }
 
-  async getProductSpecs(brand: string, sku: string, icecatId?: string): Promise<HardwareSpecs | null> {
+  async getProductSpecs(
+    brand: string,
+    sku: string,
+    icecatId?: string,
+  ): Promise<HardwareSpecs | null> {
     const rawData = await this.getRawProductData(brand, sku, icecatId);
     if (!rawData || !rawData.data) return null;
     return this.mapIcecatToHardwareSpecs(rawData);
@@ -190,49 +231,60 @@ export class IcecatService implements IIcecatService {
     if (weightVal) {
       const unit = features["Weight"]?.unit.toLowerCase();
       if (unit === "g") {
-        weight_lbs = (weightVal / 453.592);
-      } else if (unit === "kg" || (weightVal > 100)) { 
+        weight_lbs = weightVal / 453.592;
+      } else if (unit === "kg" || weightVal > 100) {
         if (weightVal > 100) {
-           weight_lbs = (weightVal / 453.592);
+          weight_lbs = weightVal / 453.592;
         } else {
-           weight_lbs = (weightVal * 2.20462);
+          weight_lbs = weightVal * 2.20462;
         }
       } else {
-        weight_lbs = (weightVal * 2.20462);
+        weight_lbs = weightVal * 2.20462;
       }
     }
 
     const specs: HardwareSpecs = {
-      cpu_family: features["Processor family"]?.value || features["Processor model"]?.value || "Unknown",
+      cpu_family:
+        features["Processor family"]?.value ||
+        features["Processor model"]?.value ||
+        "Unknown",
       cpu_cores: this.parseNumeric(features["Processor cores"]),
       ram_gb: this.parseNumeric(features["Internal memory"]),
       storage_gb: this.parseNumeric(features["Total storage capacity"]),
-      
-      gpu_model: features["Discrete graphics card model"]?.value || features["On-board graphics card model"]?.value,
-      gpu_type: (features["Discrete graphics card model"] && features["Discrete graphics card model"].value !== "Not available") 
-                 ? "discrete" : "integrated",
-      gpu_vram_gb: this.parseNumeric(features["Discrete graphics card memory"]) || 0,
+
+      gpu_model:
+        features["Discrete graphics card model"]?.value ||
+        features["On-board graphics card model"]?.value,
+      gpu_type:
+        features["Discrete graphics card model"] &&
+        features["Discrete graphics card model"].value !== "Not available"
+          ? "discrete"
+          : "integrated",
+      gpu_vram_gb:
+        this.parseNumeric(features["Discrete graphics card memory"]) || 0,
 
       screen_size_inches: screen_size ? parseFloat(screen_size.toFixed(1)) : 0,
       display_resolution: features["Display resolution"]?.value || "Unknown",
       panel_type: features["Panel type"]?.value,
       nits: this.parseNumeric(features["Display brightness"]),
-      
+
       battery_wh: this.parseNumeric(features["Battery capacity (Watt-hours)"]),
       weight_lbs: weight_lbs ? parseFloat(weight_lbs.toFixed(2)) : undefined,
     };
 
     (specs as any)._brandName = data.data.GeneralInfo.Brand;
-    
+
     return specs;
   }
 
-  private flattenFeatures(data: IcecatProductResponse): Record<string, FeatureDetail> {
+  private flattenFeatures(
+    data: IcecatProductResponse,
+  ): Record<string, FeatureDetail> {
     const flattened: Record<string, FeatureDetail> = {};
     if (!data.data.FeaturesGroups) return flattened;
 
-    data.data.FeaturesGroups.forEach(group => {
-      group.Features.forEach(feature => {
+    data.data.FeaturesGroups.forEach((group) => {
+      group.Features.forEach((feature) => {
         const key = feature.Feature.Name.Value;
         flattened[key] = {
           value: feature.PresentationValue,
@@ -247,12 +299,19 @@ export class IcecatService implements IIcecatService {
   private parseNumeric(detail?: FeatureDetail): number | undefined {
     if (!detail) return undefined;
     const presentationNum = parseFloat(detail.value);
-    const rawNum = typeof detail.rawValue === "number" ? detail.rawValue : parseFloat(detail.rawValue);
+    const rawNum =
+      typeof detail.rawValue === "number"
+        ? detail.rawValue
+        : parseFloat(detail.rawValue);
 
     if (detail.value.toLowerCase().includes("tb")) {
       return presentationNum * 1024;
     }
 
-    return isNaN(presentationNum) ? (isNaN(rawNum) ? undefined : rawNum) : presentationNum;
+    return isNaN(presentationNum)
+      ? isNaN(rawNum)
+        ? undefined
+        : rawNum
+      : presentationNum;
   }
 }

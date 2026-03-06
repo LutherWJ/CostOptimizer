@@ -100,3 +100,18 @@ export interface IIcecatService {
   getRawProductData(brand: string, sku: string, icecatId?: string): Promise<IcecatProductResponse | null>;
   getDiscoveryIndex(sinceDate: Date, limit?: number): Promise<IcecatIndexItem[]>;
 }
+
+// --- Benchmark Types ---
+
+export interface BenchmarkResult {
+  name: string;
+  type: "CPU" | "GPU";
+  score: number;
+  rank?: number;
+  extra_data?: any;
+}
+
+export interface IBenchmarkProvider {
+  name: string;
+  getBenchmarks(): Promise<BenchmarkResult[]>;
+}

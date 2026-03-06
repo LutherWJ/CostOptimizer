@@ -122,3 +122,26 @@ WHERE ls.is_active = TRUE;
 CREATE INDEX idx_rec_workloads ON laptop_recommendations USING GIN (suitable_workloads);
 CREATE INDEX idx_rec_price ON laptop_recommendations (current_price);
 CREATE INDEX idx_rec_manufacturer ON laptop_recommendations (manufacturer);
+
+-- Enable fuzzy matching extension
+CREATE EXTENSION IF NOT EXISTS pg_trgm;
+
+-- Component Benchmarks (Lookup table for CPUs and GPUs)
+CREATE TABLE component_benchmarks (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    component_name VARCHAR(255) UNIQUE NOT NULL, -- Canonical Name
+    component_type VARCHAR(50) NOT NULL,        -- 'CPU' or 'GPU'
+    benchmark_score INTEGER,                     -- Generic performance score (e.g. PassMark)
+    extra_data JSONB,                            -- Flexible storage for other metrics (Cinebench, etc.)
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Component Aliases (Mapping messy scraped names to canonical benchmark names)
+CREATE TABLE component_aliases (
+    alias_name VARCHAR(255) PRIMARY KEY,
+    canonical_name VARCHAR(255) REFERENCES component_benchmarks(component_name) ON DELETE CASCADE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX idx_benchmark_type ON component_benchmarks(component_type);
+CREATE INDEX idx_alias_canonical ON component_aliases(canonical_name);

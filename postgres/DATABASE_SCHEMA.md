@@ -73,7 +73,7 @@ The application team should primarily query this view. It flattens the relationa
 **Query Example:**
 ```sql
 -- Get the best deal for a laptop suitable for 4K Video Editing under $1500
-SELECT * FROM laptop_recommendations
+SELECT * FROM laptop_recommendation
 WHERE suitable_workloads @> '["video_editing_4k"]'
 AND current_price < 1500
 ORDER BY current_price ASC;
