@@ -5,11 +5,13 @@ import {
   ProductLineRepository,
   PriceHistoryRepository,
   ComponentBenchmarkRepository,
+  WorkloadRepository,
   db,
 } from "./repositories";
 import { LaptopDiscoveryJob } from "./jobs/LaptopDiscoveryJob";
 import { PriceSyncJob } from "./jobs/PriceSyncJob";
 import { BenchmarkSyncJob } from "./jobs/BenchmarkSyncJob";
+import { SuitabilityJob } from "./jobs/SuitabilityJob";
 import { NotebookcheckExtractor } from "./extractors/notebookcheck";
 
 const main = async () => {
@@ -21,6 +23,7 @@ const main = async () => {
   const lineRepo = new ProductLineRepository();
   const priceRepo = new PriceHistoryRepository();
   const benchmarkRepo = new ComponentBenchmarkRepository();
+  const workloadRepo = new WorkloadRepository();
 
   // Initialize Services
   const icecat = new IcecatService();
@@ -60,6 +63,12 @@ const main = async () => {
         break;
       }
 
+      case "suitability": {
+        const suitabilityJob = new SuitabilityJob(skuRepo, workloadRepo);
+        await suitabilityJob.run();
+        break;
+      }
+
       case "refresh-view": {
         console.log("Refreshing materialized view: laptop_recommendations...");
         await db`REFRESH MATERIALIZED VIEW laptop_recommendations;`.execute();
@@ -75,6 +84,7 @@ Available commands:
   discover [year] [limit] - Import laptops updated since [year].
   sync-prices             - Update latest prices from e-commerce.
   sync-benchmarks         - Sync CPU/GPU scores from Notebookcheck.
+  suitability             - Map laptops to workloads based on specs and benchmarks.
   refresh-view            - Update the materialized view for the app.
         `);
         process.exit(1);

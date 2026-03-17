@@ -72,7 +72,6 @@ describe("LaptopDiscoveryJob", () => {
       screen_size_inches: 13.5,
       display_resolution: "3000x2000",
     } as any;
-    (mockSpecs as any)._brandName = "HP";
 
     (mockIcecat.getDiscoveryIndex as any).mockImplementation(async () => [
       indexItem,

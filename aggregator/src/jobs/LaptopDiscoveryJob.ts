@@ -3,9 +3,11 @@ import {
   LaptopSkuRepository, 
   ProductLineRepository 
 } from "../repositories";
-import hardwareSpecsSchema from "../models/hardwareSpecsSchema";
+import { HardwareSpecsTransformer } from "../transformers/HardwareSpecsTransformer";
 
 export class LaptopDiscoveryJob {
+  private transformer = new HardwareSpecsTransformer();
+
   constructor(
     private icecat: IIcecatService,
     private skuRepo: LaptopSkuRepository,
@@ -43,21 +45,25 @@ export class LaptopDiscoveryJob {
             return; 
           }
 
-          const specs = await this.icecat.getProductSpecs(item.brand, item.sku, item.icecatId);
+          const rawSpecs = await this.icecat.getProductSpecs(item.brand, item.sku, item.icecatId);
           
-          if (!specs) {
+          if (!rawSpecs) {
             // console.warn(`Could not find detailed specs for ID: ${item.icecatId} (${item.brand} ${item.sku})`);
             return;
           }
 
-          // Validate specs against schema
-          const validation = hardwareSpecsSchema.safeParse(specs);
+          // 1. Validate using Transformer
+          const validation = this.transformer.validate(rawSpecs);
           if (!validation.success) {
             invalidSpecsCount++;
             return;
           }
+          const specs = validation.data!;
 
-          const brandName = item.brand || (specs as any)._brandName || "Unknown";
+          // 2. Canonicalize Brand using Transformer
+          const brandName = this.transformer.canonicalizeBrand(item.brand, rawSpecs);
+
+          // 3. Coordinate storage with Repositories
           const lineId = await this.lineRepo.upsert(brandName, brandName);
           await this.skuRepo.upsert(lineId, item.sku, specs);
           

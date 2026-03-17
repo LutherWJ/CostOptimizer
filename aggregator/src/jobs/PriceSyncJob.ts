@@ -4,8 +4,11 @@ import {
   ProductLineRepository,
   PriceHistoryRepository
 } from "../repositories";
+import { PriceTransformer } from "../transformers/PriceTransformer";
 
 export class PriceSyncJob {
+  private transformer = new PriceTransformer();
+
   constructor(
     private providers: IPriceProvider[],
     private skuRepo: LaptopSkuRepository,
@@ -28,7 +31,7 @@ export class PriceSyncJob {
 
     for (const sku of skus) {
       try {
-        // We need the manufacturer/brand for a better search
+        // Coordination logic: Need manufacturer/brand for a better search
         const productLine = await this.lineRepo.findById(sku.product_line_id);
         const brand = productLine?.manufacturer || "Unknown";
 
@@ -38,13 +41,10 @@ export class PriceSyncJob {
           const result = await provider.getLatestPrice(brand, sku.sku_number);
           
           if (result) {
-            await this.priceRepo.add({
-              laptop_sku_id: sku.id,
-              vendor: result.vendor,
-              price_usd: result.price_usd,
-              purchase_url: result.purchase_url,
-              is_refurbished: result.is_refurbished
-            });
+            // Transformation logic delegated
+            const priceRecord = this.transformer.transformPrice(sku.id, result);
+            
+            await this.priceRepo.add(priceRecord);
             pricesAdded++;
             console.log(`- Found: $${result.price_usd} (${result.is_refurbished ? 'Refurb' : 'New'})`);
           } else {

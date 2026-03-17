@@ -28,8 +28,8 @@ export class LaptopSkuRepository {
       VALUES (
         ${productLineId}, 
         ${skuNumber}, 
-        ${JSON.stringify(hardwareSpecs)}::jsonb, 
-        ${qualitativeData ? JSON.stringify(qualitativeData) : null}::jsonb
+        ${hardwareSpecs as any}, 
+        ${(qualitativeData || null) as any}
       )
       ON CONFLICT (sku_number) 
       DO UPDATE SET 
@@ -44,7 +44,15 @@ export class LaptopSkuRepository {
     const result = await db`
       SELECT * FROM laptop_skus WHERE sku_number = ${skuNumber}
     `;
-    return result.length > 0 ? (result[0] as unknown as LaptopSku) : null;
+    if (result.length === 0) return null;
+    const row = result[0] as any;
+    if (typeof row.hardware_specs === "string") {
+      row.hardware_specs = JSON.parse(row.hardware_specs);
+    }
+    if (typeof row.qualitative_data === "string" && row.qualitative_data !== null) {
+      row.qualitative_data = JSON.parse(row.qualitative_data);
+    }
+    return row as LaptopSku;
   }
 
   async updateSuitability(skuId: string, workloadIds: string[]): Promise<void> {
@@ -64,7 +72,15 @@ export class LaptopSkuRepository {
     const result = await db`
       SELECT * FROM laptop_skus WHERE is_active = TRUE
     `;
-    return result as unknown as LaptopSku[];
+    return (result as any[]).map(row => {
+      if (typeof row.hardware_specs === "string") {
+        row.hardware_specs = JSON.parse(row.hardware_specs);
+      }
+      if (typeof row.qualitative_data === "string" && row.qualitative_data !== null) {
+        row.qualitative_data = JSON.parse(row.qualitative_data);
+      }
+      return row;
+    }) as LaptopSku[];
   }
 
   /**
@@ -86,6 +102,14 @@ export class LaptopSkuRepository {
       LEFT JOIN component_benchmarks gpu ON gpu.component_name = COALESCE(ca_gpu.canonical_name, ls.hardware_specs->>'gpu_model')
       WHERE ls.is_active = TRUE;
     `;
-    return result as unknown as LaptopSkuWithBenchmarks[];
+    return (result as any[]).map(row => {
+      if (typeof row.hardware_specs === "string") {
+        row.hardware_specs = JSON.parse(row.hardware_specs);
+      }
+      if (typeof row.qualitative_data === "string" && row.qualitative_data !== null) {
+        row.qualitative_data = JSON.parse(row.qualitative_data);
+      }
+      return row;
+    }) as LaptopSkuWithBenchmarks[];
   }
 }

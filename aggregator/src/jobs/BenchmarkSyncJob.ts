@@ -1,7 +1,10 @@
 import { IBenchmarkProvider } from "../types";
 import { ComponentBenchmarkRepository } from "../repositories";
+import { BenchmarkTransformer } from "../transformers/BenchmarkTransformer";
 
 export class BenchmarkSyncJob {
+  private transformer = new BenchmarkTransformer();
+
   constructor(
     private providers: IBenchmarkProvider[],
     private benchmarkRepo: ComponentBenchmarkRepository
@@ -24,11 +27,14 @@ export class BenchmarkSyncJob {
 
         for (const benchmark of benchmarks) {
           try {
+            // Transformation logic delegated
+            const canonical = this.transformer.transformBenchmark(benchmark);
+
             await this.benchmarkRepo.upsertBenchmark(
-              benchmark.name,
-              benchmark.type,
-              benchmark.score,
-              benchmark.extra_data
+              canonical.name,
+              canonical.type,
+              canonical.score,
+              canonical.extra_data
             );
             totalUpserted++;
           } catch (err) {

@@ -112,11 +112,28 @@ SELECT
     bd.vendor as best_vendor,
     bd.purchase_url,
     bd.is_refurbished,
-    ls.updated_at as last_synced
+    ls.updated_at as last_synced,
+    -- Add Benchmark Scores
+    cpu.benchmark_score as cpu_score,
+    gpu.benchmark_score as gpu_score,
+    -- Add Value Score
+    -- Formula: ((CPU Score + GPU Score + (Storage GB * 10)) / Price)
+    (
+        (COALESCE(cpu.benchmark_score, 0) + 
+         COALESCE(gpu.benchmark_score, 0) + 
+         (COALESCE((ls.hardware_specs->>'storage_gb')::numeric, 0) * 10))
+        / NULLIF(bd.price_usd, 0)
+    ) as value_score
 FROM laptop_skus ls
 JOIN product_lines pl ON ls.product_line_id = pl.id
 LEFT JOIN suitability_agg sa ON ls.id = sa.sku_id
 JOIN best_deals bd ON ls.id = bd.laptop_sku_id
+-- Join for CPU Benchmarks
+LEFT JOIN component_aliases ca_cpu ON ca_cpu.alias_name = ls.hardware_specs->>'cpu_family'
+LEFT JOIN component_benchmarks cpu ON cpu.component_name = COALESCE(ca_cpu.canonical_name, ls.hardware_specs->>'cpu_family')
+-- Join for GPU Benchmarks
+LEFT JOIN component_aliases ca_gpu ON ca_gpu.alias_name = ls.hardware_specs->>'gpu_model'
+LEFT JOIN component_benchmarks gpu ON gpu.component_name = COALESCE(ca_gpu.canonical_name, ls.hardware_specs->>'gpu_model')
 WHERE ls.is_active = TRUE;
 
 CREATE INDEX idx_rec_workloads ON laptop_recommendations USING GIN (suitable_workloads);
