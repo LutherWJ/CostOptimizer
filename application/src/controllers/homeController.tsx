@@ -3,6 +3,5 @@ import { getAllTodos } from "../models/todos";
 import Home from "../views/Home";
 
 export const getHome = (c: Context) => {
-    return c.html(<Home/>);
-}
-
+  return c.html(Home());
+};

@@ -1,11 +1,9 @@
 import Base from './Base';
 
 const Home = () => {
-    return (
-        <Base title="Home">
-            <h1>Shits broke</h1>
-        </Base>
-    );
+  return Base(`
+    <h1>Shits broke</h1>
+  `, "Home");
 };
 
 export default Home;
