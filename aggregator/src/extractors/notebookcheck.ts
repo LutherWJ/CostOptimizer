@@ -1,6 +1,7 @@
-import { CheerioCrawler, log } from "crawlee";
-import { IBenchmarkProvider, BenchmarkResult } from "../types";
+import { CheerioCrawler } from "crawlee";
+import type { IBenchmarkProvider, BenchmarkResult } from "../types";
 import type { CheerioAPI } from "cheerio";
+import { logger } from "../utils/logger";
 
 /**
  * NotebookcheckExtractor handles scraping the massive benchmark tables 

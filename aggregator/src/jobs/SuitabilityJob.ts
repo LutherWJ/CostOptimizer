@@ -4,6 +4,7 @@ import {
 } from "../repositories";
 import { WORKLOAD_DEFINITIONS } from "../config/workloads";
 import { SuitabilityTransformer } from "../transformers/SuitabilityTransformer";
+import { logger } from "../utils/logger";
 
 export class SuitabilityJob {
   private transformer = new SuitabilityTransformer();
@@ -14,7 +15,7 @@ export class SuitabilityJob {
   ) {}
 
   async run() {
-    console.log("Starting Suitability Mapping Job...");
+    logger.info("Starting Suitability Mapping Job...");
 
     // 1. Sync Workload Definitions to DB
     const workloadIdMap = new Map<string, string>();
@@ -26,11 +27,11 @@ export class SuitabilityJob {
       );
       workloadIdMap.set(def.name, id);
     }
-    console.log(`Synced ${WORKLOAD_DEFINITIONS.length} workload definitions.`);
+    logger.info(`Synced ${WORKLOAD_DEFINITIONS.length} workload definitions.`);
 
     // 2. Fetch all active SKUs with benchmarks
     const skus = await this.skuRepo.findAllWithBenchmarks();
-    console.log(`Evaluating suitability for ${skus.length} active SKUs...`);
+    logger.info(`Evaluating suitability for ${skus.length} active SKUs...`);
 
     let updatedCount = 0;
 
@@ -46,6 +47,6 @@ export class SuitabilityJob {
       updatedCount++;
     }
 
-    console.log(`Suitability Job Finished. Updated ${updatedCount} SKUs.`);
+    logger.info(`Suitability Job Finished. Updated ${updatedCount} SKUs.`);
   }
 }

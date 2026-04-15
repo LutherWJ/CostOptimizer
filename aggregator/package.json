@@ -4,7 +4,7 @@
   "type": "module",
   "private": true,
   "scripts": {
-    "migrate": "bun src/repositories/migrate.ts",
+    "migrate": "bun src/repositories/migrate.ts"
   },
   "devDependencies": {
     "@types/bun": "latest"
@@ -15,6 +15,7 @@
   "dependencies": {
     "crawlee": "^3.16.0",
     "fast-xml-parser": "^5.4.2",
-    "hono": "^4.12.3"
+    "hono": "^4.12.3",
+    "zod": "^4.3.6"
   }
 }

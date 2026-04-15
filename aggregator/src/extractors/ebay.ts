@@ -1,14 +1,18 @@
 import type { EbayFilters, EbaySearchResponse, IEbayService } from "../types";
+import { ProductMatcher } from "../transformers/ProductMatcher";
+import { logger } from "../utils/logger";
 
 export class EbayService implements IEbayService {
   private clientId: string;
   private clientSecret: string;
   private baseUrl: string;
   public vendorName = "eBay";
+  private matcher: ProductMatcher;
 
-  constructor() {
+  constructor(matcher: ProductMatcher = new ProductMatcher()) {
     this.clientId = (process.env.EBAY_CLIENT_ID || "").trim();
     this.clientSecret = (process.env.EBAY_CLIENT_SECRET || "").trim();
+    this.matcher = matcher;
 
     const isSandbox =
       process.env.EBAY_ENVIRONMENT === "sandbox" ||
@@ -18,7 +22,7 @@ export class EbayService implements IEbayService {
       : "https://api.ebay.com";
 
     if (!this.clientId || !this.clientSecret) {
-      console.warn("eBay credentials not found in environment variables.");
+      throw new Error("CRITICAL: eBay credentials not found in environment variables.");
     }
   }
 
@@ -78,10 +82,10 @@ export class EbayService implements IEbayService {
     }
 
     const json = await response.json();
-    console.log("eBay API Raw Response:", JSON.stringify(json, null, 2));
+    logger.debug("eBay API Raw Response:", json);
 
     if (json.warnings) {
-      console.warn("eBay API Warnings:", json.warnings);
+      logger.warn("eBay API Warnings:", json.warnings);
     }
 
     return json as EbaySearchResponse;
@@ -94,44 +98,47 @@ export class EbayService implements IEbayService {
     brand: string,
     sku: string,
   ): Promise<import("../types").PriceResult | null> {
-    try {
-      const results = await this.search(`${brand} ${sku}`);
+    const results = await this.search(`${brand} ${sku}`);
 
-      if (!results.itemSummaries || results.itemSummaries.length === 0) {
-        return null;
-      }
-
-      // 1. Basic relevance check: Ensure title contains the SKU 
-      // 2. Avoid accessories: Must be in a laptop/notebook category
-      const validLaptops = results.itemSummaries.filter((item) => {
-        const title = item.title.toLowerCase();
-        const cats = item.categories?.map((c) => c.categoryName.toLowerCase()) || [];
-        const matchesSku = title.includes(sku.toLowerCase());
-        const isLaptopCat = cats.some((c) => c.includes("laptop") || c.includes("notebook"));
-        
-        return matchesSku && isLaptopCat;
-      });
-
-      if (validLaptops.length === 0) return null;
-
-      // eBay search results are generally sorted by relevance, 
-      // but we want the lowest price among the relevant ones.
-      const sorted = validLaptops.sort(
-        (a, b) => parseFloat(a.price.value) - parseFloat(b.price.value),
-      );
-
-      const bestDeal = sorted[0]!;
-
-      return {
-        vendor: this.vendorName,
-        price_usd: parseFloat(bestDeal.price.value),
-        purchase_url: bestDeal.itemWebUrl,
-        // Condition ID 1000 = "New", 1500 = "New other", 2000 = "Certified Refurbished"
-        is_refurbished: bestDeal.conditionId !== "1000",
-      };
-    } catch (err) {
-      console.error(`eBay price fetch failed for ${brand} ${sku}:`, err);
+    if (!results.itemSummaries || results.itemSummaries.length === 0) {
       return null;
     }
+
+    // 1. Filter out obvious non-laptops based on category
+    const laptopsOnly = results.itemSummaries.filter((item) => {
+      const cats = item.categories?.map((c) => c.categoryName.toLowerCase()) || [];
+      return cats.some((c) => c.includes("laptop") || c.includes("notebook"));
+    });
+
+    // 2. Use ProductMatcher to robustly verify the title matches the intended SKU
+    const validLaptops = [];
+    for (const item of laptopsOnly) {
+      const matchedSkuId = await this.matcher.match(item.title);
+      
+      const title = item.title.toLowerCase();
+      const matchesSkuString = title.includes(sku.toLowerCase());
+
+      if (matchedSkuId || matchesSkuString) {
+        validLaptops.push(item);
+      }
+    }
+
+    if (validLaptops.length === 0) return null;
+
+    // eBay search results are generally sorted by relevance, 
+    // but we want the lowest price among the relevant ones.
+    const sorted = validLaptops.sort(
+      (a, b) => parseFloat(a.price.value) - parseFloat(b.price.value),
+    );
+
+    const bestDeal = sorted[0]!;
+
+    return {
+      vendor: this.vendorName,
+      price_usd: parseFloat(bestDeal.price.value),
+      purchase_url: bestDeal.itemWebUrl,
+      // Condition ID 1000 = "New", 1500 = "New other", 2000 = "Certified Refurbished"
+      is_refurbished: bestDeal.conditionId !== "1000",
+    };
   }
 }

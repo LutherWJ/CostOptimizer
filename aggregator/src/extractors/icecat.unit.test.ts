@@ -41,9 +41,10 @@ describe("IcecatService Unit Tests", () => {
       const results = await service.getDiscoveryIndex(sinceDate);
 
       expect(results).toHaveLength(1);
-      expect(results[0].sku).toBe("HP-SKU-1");
-      expect(results[0].brand).toBe("HP");
-      expect(results[0].icecatId).toBe("123");
+      const firstResult = results[0]!;
+      expect(firstResult.sku).toBe("HP-SKU-1");
+      expect(firstResult.brand).toBe("HP");
+      expect(firstResult.icecatId).toBe("123");
 
       global.fetch = originalFetch;
     });
@@ -73,7 +74,7 @@ describe("IcecatService Unit Tests", () => {
 
       const results = await service.getDiscoveryIndex(new Date("2022-01-01"));
       expect(results).toHaveLength(1);
-      expect(results[0].sku).toBe("HP-SKU-1");
+      expect(results[0]!.sku).toBe("HP-SKU-1");
 
       global.fetch = originalFetch;
     });

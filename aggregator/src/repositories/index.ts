@@ -5,3 +5,4 @@ export * from "./WorkloadRepository";
 export * from "./PriceHistoryRepository";
 export * from "./RawScrapeRepository";
 export * from "./ComponentBenchmarkRepository";
+export * from "./AliasRepository";

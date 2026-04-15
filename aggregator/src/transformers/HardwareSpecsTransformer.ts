@@ -1,5 +1,5 @@
 import { z } from "zod";
-import hardwareSpecsSchema, { HardwareSpecs } from "../models/hardwareSpecsSchema";
+import hardwareSpecsSchema, { type HardwareSpecs } from "../models/hardwareSpecsSchema";
 
 export class HardwareSpecsTransformer {
   /**

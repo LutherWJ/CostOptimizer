@@ -85,7 +85,7 @@ export class ComponentBenchmarkRepository {
       ORDER BY similarity(component_name, ${name}) DESC
       LIMIT 5;
     `;
-    return result.map(row => this.normalizeRow(row));
+    return result.map((row: any) => this.normalizeRow(row));
   }
 
   /**
@@ -95,6 +95,6 @@ export class ComponentBenchmarkRepository {
     const result = await db`
       SELECT * FROM component_benchmarks WHERE component_type = ${type}
     `;
-    return result.map(row => this.normalizeRow(row));
+    return result.map((row: any) => this.normalizeRow(row));
   }
 }

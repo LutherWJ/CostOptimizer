@@ -44,6 +44,6 @@ describe("ComponentBenchmarkRepository", () => {
     const results = await repo.fuzzyFind("TEST_NVIDIA RTX 4060", 0.3);
     
     expect(results.length).toBeGreaterThan(0);
-    expect(results[0].component_name).toContain("4060");
+    expect(results[0]!.component_name).toContain("4060");
   });
 });

@@ -26,7 +26,7 @@ describe("NotebookcheckExtractor Integration Test", () => {
     expect(benchmarks.length).toBeGreaterThan(100); // Should be hundreds of GPUs
     
     // Check first entry
-    const sample = benchmarks[0];
+    const sample = benchmarks[0]!;
     expect(sample.name).toBeDefined();
     expect(sample.score).toBeGreaterThan(0);
     expect(sample.type).toBe("GPU");
@@ -52,7 +52,7 @@ describe("NotebookcheckExtractor Integration Test", () => {
 
     expect(benchmarks.length).toBeGreaterThan(100);
     
-    const sample = benchmarks[0];
+    const sample = benchmarks[0]!;
     expect(sample.name).toBeDefined();
     expect(sample.score).toBeGreaterThan(0);
     expect(sample.type).toBe("CPU");

@@ -1,6 +1,6 @@
 import { describe, it, expect, mock, beforeEach } from "bun:test";
 import { PriceSyncJob } from "./PriceSyncJob";
-import { IPriceProvider, PriceResult } from "../types";
+import type { IPriceProvider, PriceResult } from "../types";
 import { LaptopSkuRepository, ProductLineRepository, PriceHistoryRepository } from "../repositories";
 
 describe("PriceSyncJob", () => {
@@ -92,7 +92,7 @@ describe("PriceSyncJob", () => {
     expect(mockPriceRepo.add).not.toHaveBeenCalled();
   });
 
-  it("should handle provider errors gracefully", async () => {
+  it("should fail fast on provider errors", async () => {
     const mockSku = {
       id: "sku-error",
       product_line_id: "line-error",
@@ -105,10 +105,9 @@ describe("PriceSyncJob", () => {
       throw new Error("API Failure");
     });
 
-    await job.run();
+    await expect(job.run()).rejects.toThrow("API Failure");
 
     expect(mockProvider.getLatestPrice).toHaveBeenCalled();
-    // Job should continue and log error, not crash
     expect(mockPriceRepo.add).not.toHaveBeenCalled();
   });
 });

@@ -1,4 +1,4 @@
-import { HardwareSpecs } from "./models/hardwareSpecsSchema";
+import type { HardwareSpecs } from "./models/hardwareSpecsSchema";
 
 // --- eBay Types ---
 

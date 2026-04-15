@@ -5,6 +5,7 @@ import type {
   IcecatProductResponse,
   IcecatIndexItem,
 } from "../types";
+import { logger } from "../utils/logger";
 
 interface FeatureDetail {
   value: string;
@@ -36,7 +37,7 @@ export class IcecatService implements IIcecatService {
     this.password = (process.env.ICECAT_PASSWORD || "").trim();
 
     if (!this.apiToken) {
-      console.warn("Warning: ICECAT_ACCESS_TOKEN not found.");
+      logger.warn("ICECAT_ACCESS_TOKEN not found in environment variables.");
     }
   }
 
@@ -47,15 +48,14 @@ export class IcecatService implements IIcecatService {
     const indexUrl = `https://data.icecat.biz/export/freexml.int/INT/files.index.xml.gz`;
 
     if (!this.username || !this.password) {
-      console.error("CRITICAL: ICECAT_USER or ICECAT_PASSWORD is not set.");
-      return [];
+      throw new Error("CRITICAL: ICECAT_USER or ICECAT_PASSWORD is not set.");
     }
 
     try {
       const auth = Buffer.from(`${this.username}:${this.password}`).toString(
         "base64",
       );
-      console.log(
+      logger.info(
         `Downloading and parsing Full Icecat Index (Since: ${sinceDate.getFullYear()})...`,
       );
 
@@ -104,7 +104,7 @@ export class IcecatService implements IIcecatService {
           if (!fileAttrs) continue;
 
           if (totalTagsProcessed % 250000 === 0) {
-            console.log(`Progress: Searched ${totalTagsProcessed} tags...`);
+            logger.info(`Progress: Searched ${totalTagsProcessed} tags...`);
           }
 
           // Note: Icecat XML uses Capitalized Attributes (Catid, Prod_ID, etc.)
@@ -144,16 +144,13 @@ export class IcecatService implements IIcecatService {
         fileTagRegex.lastIndex = 0;
       }
 
-      console.log(
+      logger.info(
         `Parsed ${totalTagsProcessed} total tags. Found ${items.length} matching laptops.`,
       );
       return items;
     } catch (error) {
-      console.error(
-        "Error fetching Icecat discovery index:",
-        error instanceof Error ? error.message : error,
-      );
-      return [];
+      logger.error("Error fetching Icecat discovery index:", error);
+      throw error;
     }
   }
 
@@ -189,20 +186,13 @@ export class IcecatService implements IIcecatService {
       if (!response.ok) {
         if (response.status === 404) return null;
         const errorBody = await response.text();
-        console.error(
-          `Icecat Live API Error (ID: ${icecatId || brand + " " + sku}): ${response.status}`,
-          errorBody,
-        );
-        return null;
+        throw new Error(`Icecat Live API Error (ID: ${icecatId || brand + " " + sku}): ${response.status} - ${errorBody}`);
       }
 
       return (await response.json()) as IcecatProductResponse;
     } catch (error) {
-      console.error(
-        `Failed to fetch from Icecat for ID: ${icecatId || brand + " " + sku}:`,
-        error,
-      );
-      return null;
+      logger.error(`Failed to fetch from Icecat for ID: ${icecatId || brand + " " + sku}:`, error);
+      throw error;
     }
   }
 
@@ -249,8 +239,8 @@ export class IcecatService implements IIcecatService {
         features["Processor model"]?.value ||
         "Unknown",
       cpu_cores: this.parseNumeric(features["Processor cores"]),
-      ram_gb: this.parseNumeric(features["Internal memory"]),
-      storage_gb: this.parseNumeric(features["Total storage capacity"]),
+      ram_gb: this.parseNumeric(features["Internal memory"]) || 0,
+      storage_gb: this.parseNumeric(features["Total storage capacity"]) || 0,
 
       gpu_model:
         features["Discrete graphics card model"]?.value ||

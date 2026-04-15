@@ -117,11 +117,10 @@ SELECT
     cpu.benchmark_score as cpu_score,
     gpu.benchmark_score as gpu_score,
     -- Add Value Score
-    -- Formula: ((CPU Score + GPU Score + (Storage GB * 10)) / Price)
+    -- Formula: ((CPU Score + GPU Score) / Price)
     (
         (COALESCE(cpu.benchmark_score, 0) + 
-         COALESCE(gpu.benchmark_score, 0) + 
-         (COALESCE((ls.hardware_specs->>'storage_gb')::numeric, 0) * 10))
+         COALESCE(gpu.benchmark_score, 0))
         / NULLIF(bd.price_usd, 0)
     ) as value_score
 FROM laptop_skus ls
