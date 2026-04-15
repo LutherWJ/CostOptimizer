@@ -13,7 +13,7 @@ describe("ProductMatcher End-to-End Integration", () => {
   const skuRepo = new LaptopSkuRepository();
   const lineRepo = new ProductLineRepository();
   const ollamaService = new OllamaService(); // Uses env OLLAMA_MODEL
-  const matcher = new ProductMatcher(aliasRepo, ollamaService, 0.85);
+  const matcher = new ProductMatcher(aliasRepo, skuRepo, ollamaService, 0.85);
 
   const testMessyTitle = "INTEGRATION_TEST_MESSY_TITLE_LENOVO_LEGION_5_PRO_16_INCH";
   const expectedSku = "INTEGRATION-LEGION-5-PRO-16";
