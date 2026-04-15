@@ -20,8 +20,15 @@ describe("ProductMatcher End-to-End Integration", () => {
   let insertedSkuId: string;
 
   beforeAll(async () => {
+    // 0. Ensure schema is initialized
+    await aliasRepo.initializeSchema();
+
     // 1. Clean up any existing test data
-    await db`DELETE FROM sku_aliases WHERE raw_string = ${testMessyTitle}`;
+    try {
+      await db`DELETE FROM sku_aliases WHERE raw_string = ${testMessyTitle}`;
+    } catch (e) {
+      // Ignore if table didn't exist yet
+    }
     await db`DELETE FROM laptop_skus WHERE sku_number = ${expectedSku}`;
     await db`DELETE FROM product_lines WHERE manufacturer = 'INTEGRATION_TEST_LENOVO'`;
 
