@@ -12,6 +12,8 @@ describe("OllamaService Integration", () => {
   it("should extract hardware details from a messy title", async () => {
     const service = getService(); // Uses env default
     
+    const messyTitle = "Dell XPS 13 9315 13.4\" FHD+ Laptop Core i7-1250U 16GB 512GB SSD Windows 11";
+    
     console.log(`Testing Ollama Extraction with title: "${messyTitle}"`);
     const result = await service.extractProductDetails(messyTitle);
     

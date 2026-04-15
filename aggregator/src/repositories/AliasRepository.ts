@@ -15,8 +15,9 @@ export class AliasRepository {
    */
   async initializeSchema(): Promise<void> {
     try {
-      // Enable pg_trgm extension if not already enabled
+      // Enable necessary extensions
       await db`CREATE EXTENSION IF NOT EXISTS pg_trgm;`;
+      await db`CREATE EXTENSION IF NOT EXISTS pgcrypto;`;
 
       await db`
         CREATE TABLE IF NOT EXISTS sku_aliases (

@@ -39,11 +39,19 @@ export class LaptopSkuRepository {
     `;
 
     if (result.length === 0) {
-      console.error(`Laptop SKU upsert failed for ${skuNumber}: No row returned`);
-      throw new Error(`Laptop SKU upsert failed for ${skuNumber}`);
+      console.error(`Laptop SKU upsert failed for ${skuNumber}. Result:`, JSON.stringify(result));
+      throw new Error(`Laptop SKU upsert failed for ${skuNumber}: No rows returned`);
     }
 
-    return result[0].id as string;
+    const row = result[0] as any;
+    const id = row.id || row.ID || row.uuid || row.UUID;
+    
+    if (!id) {
+      console.error(`Laptop SKU upsert returned a row but no ID column was found. Keys: ${Object.keys(row).join(", ")}`);
+      throw new Error(`Laptop SKU upsert failed for ${skuNumber}: ID column missing in response`);
+    }
+
+    return id as string;
   }
 
   async findBySkuNumber(skuNumber: string): Promise<LaptopSku | null> {

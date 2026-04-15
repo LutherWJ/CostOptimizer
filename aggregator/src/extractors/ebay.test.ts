@@ -4,6 +4,7 @@ import { EbayService } from "./ebay";
 describe("EbayService Integration", () => {
   const service = new EbayService();
   const hasCredentials = !!process.env.EBAY_CLIENT_ID && !!process.env.EBAY_CLIENT_SECRET;
+  const FETCH_TIMEOUT = 15000;
 
   if (!hasCredentials) {
     console.warn("Skipping eBay Integration tests: EBAY_CLIENT_ID or EBAY_CLIENT_SECRET not set.");
@@ -19,7 +20,7 @@ describe("EbayService Integration", () => {
     expect(results).toBeDefined();
     expect(results.total).toBeGreaterThan(0);
     console.log("Search successful, total results:", results.total);
-  });
+  }, FETCH_TIMEOUT);
 
   it("should search with filters", async () => {
     if (!hasCredentials) return;
@@ -31,5 +32,5 @@ describe("EbayService Integration", () => {
     
     expect(results.itemSummaries).toBeDefined();
     expect(results.itemSummaries?.length).toBeLessThanOrEqual(5);
-  });
+  }, FETCH_TIMEOUT);
 });

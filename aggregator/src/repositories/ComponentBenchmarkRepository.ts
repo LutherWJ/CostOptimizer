@@ -43,10 +43,18 @@ export class ComponentBenchmarkRepository {
 
     if (result.length === 0) {
       console.error(`Benchmark upsert failed for ${name}. Result:`, JSON.stringify(result));
-      throw new Error(`Benchmark upsert failed for ${name}`);
+      throw new Error(`Benchmark upsert failed for ${name}: No rows returned`);
     }
 
-    return result[0].id as string;
+    const row = result[0] as any;
+    const id = row.id || row.ID || row.uuid || row.UUID;
+    
+    if (!id) {
+      console.error(`Benchmark upsert returned a row but no ID column was found. Keys: ${Object.keys(row).join(", ")}`);
+      throw new Error(`Benchmark upsert failed for ${name}: ID column missing in response`);
+    }
+
+    return id as string;
   }
 
   /**
