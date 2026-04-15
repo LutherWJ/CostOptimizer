@@ -39,16 +39,23 @@ async function debug() {
     await checkTable("laptop_skus");
     await checkTable("component_benchmarks");
 
-    console.log("\n--- Testing Raw Insert ---");
+    console.log("\n--- Testing ON CONFLICT Insert ---");
     try {
-      const testInsert = await db`
+      const upsertResult = await db`
         INSERT INTO product_lines (manufacturer, line_name)
         VALUES ('DEBUG_TEST', 'DEBUG_LINE')
-        RETURNING *;
+        ON CONFLICT (manufacturer, line_name)
+        DO UPDATE SET updated_at = CURRENT_TIMESTAMP
+        RETURNING id;
       `;
-      console.log("Insert result:", JSON.stringify(testInsert));
+      console.log("Upsert result:", JSON.stringify(upsertResult));
+      if (upsertResult.length > 0) {
+        console.log("Success! ID returned:", upsertResult[0].id);
+      } else {
+        console.log("FAILURE: Upsert returned an empty array [].");
+      }
     } catch (e: any) {
-      console.error("Insert failed:", e.message);
+      console.error("Upsert failed with error:", e.message);
     }
 
   } catch (err: any) {
