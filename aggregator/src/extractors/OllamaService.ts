@@ -17,8 +17,9 @@ export class OllamaService {
     } else if (process.env.OLLAMA_URL) {
       this.baseUrl = process.env.OLLAMA_URL;
     } else if (process.env.OLLAMA_HOSTNAME) {
-      const port = process.env.OLLAMA_PORT || "11434";
-      this.baseUrl = `http://${process.env.OLLAMA_HOSTNAME}:${port}`;
+      const host = process.env.OLLAMA_HOSTNAME.trim();
+      const port = (process.env.OLLAMA_PORT || "11434").toString().trim();
+      this.baseUrl = `http://${host}:${port}`;
     } else {
       this.baseUrl = "http://localhost:11434";
     }

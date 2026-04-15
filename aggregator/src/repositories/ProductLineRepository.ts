@@ -20,7 +20,7 @@ export class ProductLineRepository {
     
     if (result.length === 0) {
       // This should theoretically not happen with ON CONFLICT DO UPDATE
-      console.error(`Upsert failed for ${manufacturer} ${line_name}: No row returned`);
+      console.error(`Upsert failed for ${manufacturer} ${line_name}. Result:`, JSON.stringify(result));
       throw new Error(`Upsert failed for ${manufacturer} ${line_name}`);
     }
     

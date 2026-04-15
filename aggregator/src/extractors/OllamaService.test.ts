@@ -5,14 +5,12 @@ describe("OllamaService Integration", () => {
   // Increase timeout for LLM inference
   const FETCH_TIMEOUT = 60000;
   
-  const getService = (model: string) => {
-    return new OllamaService(null, model);
+  const getService = (model?: string) => {
+    return new OllamaService(null, model || process.env.OLLAMA_MODEL || "llama3");
   };
   
   it("should extract hardware details from a messy title", async () => {
-    const service = getService("tinydolphin");
-    
-    const messyTitle = "Dell XPS 13 9315 13.4\" FHD+ Laptop Core i7-1250U 16GB 512GB SSD Windows 11";
+    const service = getService(); // Uses env default
     
     console.log(`Testing Ollama Extraction with title: "${messyTitle}"`);
     const result = await service.extractProductDetails(messyTitle);

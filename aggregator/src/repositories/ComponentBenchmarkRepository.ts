@@ -42,7 +42,7 @@ export class ComponentBenchmarkRepository {
     `;
 
     if (result.length === 0) {
-      console.error(`Benchmark upsert failed for ${name}: No row returned`);
+      console.error(`Benchmark upsert failed for ${name}. Result:`, JSON.stringify(result));
       throw new Error(`Benchmark upsert failed for ${name}`);
     }
 
