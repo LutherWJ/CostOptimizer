@@ -9,10 +9,19 @@ export class OllamaService {
   private model: string;
 
   constructor(
-    baseUrl: string = process.env.OLLAMA_URL || "http://localhost:11434", 
+    baseUrl: string | null = null,
     model: string = process.env.OLLAMA_MODEL || "llama3"
   ) {
-    this.baseUrl = baseUrl;
+    if (baseUrl) {
+      this.baseUrl = baseUrl;
+    } else if (process.env.OLLAMA_URL) {
+      this.baseUrl = process.env.OLLAMA_URL;
+    } else if (process.env.OLLAMA_HOSTNAME) {
+      const port = process.env.OLLAMA_PORT || "11434";
+      this.baseUrl = `http://${process.env.OLLAMA_HOSTNAME}:${port}`;
+    } else {
+      this.baseUrl = "http://localhost:11434";
+    }
     this.model = model;
   }
 

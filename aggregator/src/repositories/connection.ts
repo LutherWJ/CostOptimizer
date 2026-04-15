@@ -3,11 +3,24 @@ import { parse } from "pg-connection-string";
 
 const connectionString = process.env.DATABASE_URL;
 
-if (!connectionString) {
-  throw new Error("❌ DATABASE_URL is not defined in the environment variables!");
+let config: any = {};
+
+if (connectionString) {
+  config = parse(connectionString);
+} else {
+  // Fallback to individual variables
+  config = {
+    user: process.env.POSTGRES_USER,
+    password: process.env.POSTGRES_PASSWORD,
+    host: process.env.POSTGRES_HOSTNAME,
+    port: process.env.POSTGRES_PORT,
+    database: process.env.POSTGRES_DB,
+  };
 }
 
-const config = parse(connectionString);
+if (!config.host || !config.database) {
+  throw new Error("❌ Database configuration is incomplete. Provide DATABASE_URL or POSTGRES_ environment variables.");
+}
 
 // Optional: Debug log to verify what the container sees (remove in production)
 console.log(`Connecting to DB at ${config.host}:${config.port} as ${config.user}`);
