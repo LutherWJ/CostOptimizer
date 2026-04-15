@@ -37,6 +37,12 @@ export class LaptopSkuRepository {
         qualitative_data = COALESCE(EXCLUDED.qualitative_data, laptop_skus.qualitative_data)
       RETURNING id;
     `;
+
+    if (result.length === 0) {
+      console.error(`Laptop SKU upsert failed for ${skuNumber}: No row returned`);
+      throw new Error(`Laptop SKU upsert failed for ${skuNumber}`);
+    }
+
     return result[0].id as string;
   }
 

@@ -17,6 +17,13 @@ export class ProductLineRepository {
       DO UPDATE SET updated_at = CURRENT_TIMESTAMP
       RETURNING id;
     `;
+    
+    if (result.length === 0) {
+      // This should theoretically not happen with ON CONFLICT DO UPDATE
+      console.error(`Upsert failed for ${manufacturer} ${line_name}: No row returned`);
+      throw new Error(`Upsert failed for ${manufacturer} ${line_name}`);
+    }
+    
     return result[0].id as string;
   }
 

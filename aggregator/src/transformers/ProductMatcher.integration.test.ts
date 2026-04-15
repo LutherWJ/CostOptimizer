@@ -12,7 +12,7 @@ describe("ProductMatcher End-to-End Integration", () => {
   const aliasRepo = new AliasRepository();
   const skuRepo = new LaptopSkuRepository();
   const lineRepo = new ProductLineRepository();
-  const ollamaService = new OllamaService("http://localhost:11434", "tinydolphin");
+  const ollamaService = new OllamaService(null, "tinydolphin");
   const matcher = new ProductMatcher(aliasRepo, ollamaService, 0.85);
 
   const testMessyTitle = "INTEGRATION_TEST_MESSY_TITLE_LENOVO_LEGION_5_PRO_16_INCH";
@@ -27,6 +27,8 @@ describe("ProductMatcher End-to-End Integration", () => {
 
     // 2. Insert mock product line and SKU
     const lineId = await lineRepo.upsert("INTEGRATION_TEST_LENOVO", "INTEGRATION_TEST_LEGION");
+    if (!lineId) throw new Error("Failed to insert integration test product line");
+
     insertedSkuId = await skuRepo.upsert(
       lineId, 
       expectedSku, 
@@ -39,6 +41,7 @@ describe("ProductMatcher End-to-End Integration", () => {
         display_resolution: "2560x1600"
       }
     );
+    if (!insertedSkuId) throw new Error("Failed to insert integration test SKU");
   });
 
   afterAll(async () => {

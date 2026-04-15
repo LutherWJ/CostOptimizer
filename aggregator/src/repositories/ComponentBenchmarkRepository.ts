@@ -40,6 +40,12 @@ export class ComponentBenchmarkRepository {
         updated_at = CURRENT_TIMESTAMP
       RETURNING id;
     `;
+
+    if (result.length === 0) {
+      console.error(`Benchmark upsert failed for ${name}: No row returned`);
+      throw new Error(`Benchmark upsert failed for ${name}`);
+    }
+
     return result[0].id as string;
   }
 
