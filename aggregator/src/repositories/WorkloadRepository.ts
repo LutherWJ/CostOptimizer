@@ -22,7 +22,21 @@ export class WorkloadRepository {
         description = COALESCE(EXCLUDED.description, workload_requirements.description)
       RETURNING id;
     `;
-    return result[0].id as string;
+
+    if (result.length === 0) {
+      console.error(`Workload upsert failed for ${name}. Result:`, JSON.stringify(result));
+      throw new Error(`Workload upsert failed for ${name}: No rows returned`);
+    }
+
+    const row = result[0] as any;
+    const id = row.id || row.ID || row.uuid || row.UUID;
+    
+    if (!id) {
+      console.error(`Workload upsert returned a row but no ID column was found. Keys: ${Object.keys(row).join(", ")}`);
+      throw new Error(`Workload upsert failed for ${name}: ID column missing in response`);
+    }
+
+    return id as string;
   }
 
   async getAll(): Promise<WorkloadRequirement[]> {
