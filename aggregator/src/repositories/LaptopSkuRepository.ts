@@ -56,7 +56,7 @@ export class LaptopSkuRepository {
 
   async findBySkuNumber(skuNumber: string): Promise<LaptopSku | null> {
     const result = await db`
-      SELECT * FROM laptop_skus WHERE sku_number = ${skuNumber}
+      SELECT * FROM laptop_skus WHERE LOWER(sku_number) = LOWER(${skuNumber})
     `;
     if (result.length === 0) return null;
     const row = result[0] as any;
@@ -67,6 +67,25 @@ export class LaptopSkuRepository {
       row.qualitative_data = JSON.parse(row.qualitative_data);
     }
     return row as LaptopSku;
+  }
+
+  async findFuzzy(normalizedTitle: string): Promise<{ id: string, score: number } | null> {
+    try {
+      const results = await db`
+        SELECT id, SIMILARITY(LOWER(REGEXP_REPLACE(sku_number, '[^a-z0-9]', '', 'g')), ${normalizedTitle}) as score
+        FROM laptop_skus
+        ORDER BY score DESC
+        LIMIT 1;
+      `;
+      
+      if (results.length > 0) {
+        const row = results[0];
+        return { id: row.id as string, score: parseFloat(row.score as string) };
+      }
+    } catch (err: any) {
+       console.error("Fuzzy Match Query Error:", err);
+    }
+    return null;
   }
 
   async updateSuitability(skuId: string, workloadIds: string[]): Promise<void> {

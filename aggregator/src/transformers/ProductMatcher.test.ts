@@ -1,16 +1,12 @@
 import { describe, it, expect, mock, beforeEach } from "bun:test";
 import { ProductMatcher } from "./ProductMatcher";
 import { AliasRepository } from "../repositories/AliasRepository";
+import { LaptopSkuRepository } from "../repositories/LaptopSkuRepository";
 import { OllamaService } from "../extractors/OllamaService";
-import { db } from "../repositories/connection";
-
-// Mock the db and repositories
-mock.module("../repositories/connection", () => ({
-  db: mock(() => [])
-}));
 
 describe("ProductMatcher", () => {
   let mockAliasRepo: AliasRepository;
+  let mockSkuRepo: LaptopSkuRepository;
   let mockOllamaService: OllamaService;
   let matcher: ProductMatcher;
 
@@ -20,11 +16,16 @@ describe("ProductMatcher", () => {
       saveAlias: mock(async () => "alias-id"),
     } as any;
 
+    mockSkuRepo = {
+      findFuzzy: mock(async () => null),
+      findBySkuNumber: mock(async () => null),
+    } as any;
+
     mockOllamaService = {
       extractProductDetails: mock(async () => null),
     } as any;
 
-    matcher = new ProductMatcher(mockAliasRepo, mockOllamaService, 0.85);
+    matcher = new ProductMatcher(mockAliasRepo, mockSkuRepo, mockOllamaService, 0.85);
   });
 
   it("should return cached SKU ID if available (Tier 1)", async () => {
@@ -39,11 +40,9 @@ describe("ProductMatcher", () => {
   });
 
   it("should use fuzzy matching if not in cache (Tier 2)", async () => {
-    // Mock db call for fuzzy search
-    const mockDb = (db as any);
-    mockDb.mockImplementation(async () => [
-      { id: "fuzzy-sku-id", score: "0.90" }
-    ]);
+    (mockSkuRepo.findFuzzy as any).mockImplementation(async () => ({
+      id: "fuzzy-sku-id", score: 0.90
+    }));
 
     const result = await matcher.match("Dell XPS 13 9315");
     
@@ -52,11 +51,10 @@ describe("ProductMatcher", () => {
   });
 
   it("should fall back to LLM if fuzzy match is below threshold (Tier 3)", async () => {
-    const mockDb = (db as any);
     // Tier 2 fails (low score)
-    mockDb.mockImplementationOnce(async () => [
-      { id: "bad-match-id", score: "0.40" }
-    ]);
+    (mockSkuRepo.findFuzzy as any).mockImplementationOnce(async () => ({
+      id: "bad-match-id", score: 0.40
+    }));
     
     // Tier 3: LLM extracts SKU
     (mockOllamaService.extractProductDetails as any).mockImplementation(async () => ({
@@ -66,9 +64,9 @@ describe("ProductMatcher", () => {
     }));
 
     // Tier 3: DB lookup for the extracted SKU succeeds
-    mockDb.mockImplementationOnce(async () => [
-      { id: "llm-sku-id", sku_number: "A2337" }
-    ]);
+    (mockSkuRepo.findBySkuNumber as any).mockImplementationOnce(async () => ({
+      id: "llm-sku-id", sku_number: "A2337"
+    }));
 
     const result = await matcher.match("MacBook Air M1 2020");
     
@@ -78,8 +76,7 @@ describe("ProductMatcher", () => {
   });
 
   it("should return null if all tiers fail", async () => {
-    const mockDb = (db as any);
-    mockDb.mockImplementation(async () => []); // Fuzzy fails
+    (mockSkuRepo.findFuzzy as any).mockImplementation(async () => null); // Fuzzy fails
     (mockOllamaService.extractProductDetails as any).mockImplementation(async () => null); // LLM fails
 
     const result = await matcher.match("Totally Unknown Product 123");
