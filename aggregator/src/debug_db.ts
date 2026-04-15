@@ -20,6 +20,14 @@ async function debug() {
         `;
         console.table(columns);
         
+        const indexes = await db`
+          SELECT indexname, indexdef
+          FROM pg_indexes
+          WHERE tablename = ${name};
+        `;
+        console.log("Indexes found:");
+        console.table(indexes);
+
         const count = await db`SELECT COUNT(*) FROM ${db.unsafe(name)}`;
         console.log(`Row count: ${count[0].count}`);
       } catch (e: any) {
