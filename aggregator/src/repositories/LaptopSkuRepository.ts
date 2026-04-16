@@ -12,6 +12,7 @@ export interface LaptopSku {
 }
 
 export interface LaptopSkuWithBenchmarks extends LaptopSku {
+  manufacturer?: string;
   cpu_benchmark_score?: number;
   gpu_benchmark_score?: number;
 }
@@ -89,11 +90,13 @@ export class LaptopSkuRepository {
    */
   async findAllWithBenchmarks(): Promise<LaptopSkuWithBenchmarks[]> {
     const result = await db`
-      SELECT 
+      SELECT
         ls.*,
+        pl.manufacturer,
         cpu.benchmark_score as cpu_benchmark_score,
         gpu.benchmark_score as gpu_benchmark_score
       FROM laptop_skus ls
+      JOIN product_lines pl ON ls.product_line_id = pl.id
       -- Join for CPU
       LEFT JOIN component_aliases ca_cpu ON ca_cpu.alias_name = ls.hardware_specs->>'cpu_family'
       LEFT JOIN component_benchmarks cpu ON cpu.component_name = COALESCE(ca_cpu.canonical_name, ls.hardware_specs->>'cpu_family')

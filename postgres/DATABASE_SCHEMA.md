@@ -10,7 +10,7 @@ Represents a laptop "chassis" or brand family (e.g., "Dell XPS 13", "Lenovo Thin
 | Column | Type | Description |
 | :--- | :--- | :--- |
 | `id` | UUID | Primary Key (auto-generated). |
-| `manufacturer` | VARCHAR | e.g., "Apple", "Dell", "ASUS". |
+| `manufact[DATABASE_SCHEMA.md](DATABASE_SCHEMA.md)urer` | VARCHAR | e.g., "Apple", "Dell", "ASUS". |
 | `line_name` | VARCHAR | e.g., "MacBook Air", "ROG Zephyrus G14". |
 | `created_at` | TIMESTAMP | Record creation time. |
 | `updated_at` | TIMESTAMP | Last update time. |

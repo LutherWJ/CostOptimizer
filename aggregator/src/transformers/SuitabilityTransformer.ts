@@ -19,8 +19,8 @@ export class SuitabilityTransformer {
     // CPU Cores check
     if (min.cpu_cores && (specs.cpu_cores || 0) < min.cpu_cores) return false;
 
-    // GPU Type check
-    if (min.gpu_type && specs.gpu_type !== min.gpu_type) return false;
+    // GPU Type check — "integrated" means any GPU is fine; "discrete" requires dedicated GPU
+    if (min.gpu_type === "discrete" && specs.gpu_type !== "discrete") return false;
 
     // VRAM check
     if (min.vram_gb && (specs.gpu_vram_gb || 0) < min.vram_gb) return false;
@@ -30,6 +30,10 @@ export class SuitabilityTransformer {
 
     // GPU Benchmark check
     if (min.min_gpu_score && (sku.gpu_benchmark_score || 0) < min.min_gpu_score) return false;
+
+    // OS check — inferred from manufacturer (Apple = macOS, everything else = Windows)
+    if (min.os_requirement === "win" && sku.manufacturer === "Apple") return false;
+    if (min.os_requirement === "mac" && sku.manufacturer !== "Apple") return false;
 
     return true;
   }
