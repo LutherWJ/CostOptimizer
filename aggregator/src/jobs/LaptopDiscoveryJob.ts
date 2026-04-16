@@ -24,14 +24,16 @@ export class LaptopDiscoveryJob {
     
     // Calculate absolute minimum requirements from workload definitions
     const minRamRequired = Math.min(...WORKLOAD_DEFINITIONS.map(w => w.min_specs.ram_gb));
-    const minStorageRequired = Math.min(...WORKLOAD_DEFINITIONS.map(w => w.min_specs.storage_gb || 0));
+    // Filter out 0 or undefined storage requirements before finding the minimum
+    const storageSpecs = WORKLOAD_DEFINITIONS
+      .map(w => w.min_specs.storage_gb)
+      .filter((s): s is number => !!s && s > 0);
+    const minStorageRequired = storageSpecs.length > 0 ? Math.min(...storageSpecs) : 128; // Default to 128GB floor
     
     logger.info(`Quality Filter Active: RAM >= ${minRamRequired}GB, Storage >= ${minStorageRequired}GB`);
 
     // Fetch a larger buffer from the index to account for invalid items
-    // If no limit is provided, we fetch everything.
-    // If a limit is provided, we fetch 10x that amount from the index to ensure we find enough valid ones.
-    const indexLimit = limit ? limit * 10 : undefined;
+    const indexLimit = limit ? limit * 50 : undefined;
     const index = await this.icecat.getDiscoveryIndex(sinceDate, indexLimit);
     logger.info(`Found ${index.length} potential items in Icecat index.`);
 
