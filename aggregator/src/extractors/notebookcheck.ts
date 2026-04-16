@@ -1,11 +1,11 @@
-import { CheerioCrawler } from "crawlee";
+import { PlaywrightCrawler } from "crawlee";
 import type { IBenchmarkProvider, BenchmarkResult } from "../types";
 import type { CheerioAPI } from "cheerio";
 import { logger } from "../utils/logger";
 
 /**
  * NotebookcheckExtractor handles scraping the massive benchmark tables 
- * for both CPUs and GPUs.
+ * for both CPUs and GPUs using Playwright to bypass blocks.
  */
 export class NotebookcheckExtractor implements IBenchmarkProvider {
   public name = "Notebookcheck";
@@ -16,41 +16,32 @@ export class NotebookcheckExtractor implements IBenchmarkProvider {
   async getBenchmarks(): Promise<BenchmarkResult[]> {
     const allResults: BenchmarkResult[] = [];
 
-    const crawler = new CheerioCrawler({
+    const crawler = new PlaywrightCrawler({
       maxRequestsPerCrawl: 10,
       requestHandlerTimeoutSecs: 60,
       maxConcurrency: 1, // Be gentle
-      useSessionPool: true,
-      persistCookiesPerSession: true,
-      preNavigationHooks: [
-        (_context, gotOptions) => {
-          gotOptions.http2 = false;
-          gotOptions.headers = {
-            ...gotOptions.headers,
-            "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36",
-            "accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
-            "accept-language": "en-US,en;q=0.9",
-            "accept-encoding": "gzip, deflate, br",
-            "referer": "https://www.google.com/",
-            "dnt": "1",
-            "upgrade-insecure-requests": "1",
-            "sec-ch-ua": '"Google Chrome";v="123", "Not:A-Brand";v="8", "Chromium";v="123"',
-            "sec-ch-ua-mobile": "?0",
-            "sec-ch-ua-platform": '"macOS"',
-            "sec-fetch-dest": "document",
-            "sec-fetch-mode": "navigate",
-            "sec-fetch-site": "cross-site",
-            "sec-fetch-user": "?1",
-          };
+      launchContext: {
+        launchOptions: {
+          headless: true,
         },
-      ],
-      async requestHandler({ $, request }) {
+      },
+      async requestHandler({ page, request, parseWithCheerio }) {
         const url = request.url;
-        logger.info(`Processing ${url}...`);
+        logger.info(`Processing ${url} with Playwright...`);
+
+        // Wait for the table to be rendered by JS
+        try {
+          await page.waitForSelector("table.sortable", { timeout: 30000 });
+        } catch (e) {
+          logger.error(`Timeout waiting for table on ${url}. Page might not have loaded correctly.`);
+          return;
+        }
 
         const isGPU = url.includes("Graphics-Cards");
         const componentType: "CPU" | "GPU" = isGPU ? "GPU" : "CPU";
 
+        // Use Crawlee's helper to get a Cheerio instance of the rendered page
+        const $ = await parseWithCheerio();
         const benchmarks = NotebookcheckExtractor.extractFromTable($, componentType);
         
         // Add source info to extra_data
@@ -59,6 +50,7 @@ export class NotebookcheckExtractor implements IBenchmarkProvider {
            else b.extra_data = { source_url: url };
         });
 
+        logger.info(`Successfully extracted ${benchmarks.length} ${componentType} benchmarks from ${url}`);
         allResults.push(...benchmarks);
       },
     });
