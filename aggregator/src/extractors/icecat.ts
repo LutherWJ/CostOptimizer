@@ -125,9 +125,14 @@ export class IcecatService implements IIcecatService {
           const icecatId = String(
             fileAttrs.Product_ID || fileAttrs.product_id || "",
           );
+
+          // Skip vintage models (Low Icecat IDs) - Modern ones are usually > 10,000,000
+          // This avoids the "empty specs" problem with archived products.
+          if (parseInt(icecatId) < 1000000) continue;
+
           const brand = String(
             fileAttrs.Supplier_name || fileAttrs.supplier_name || "",
-          ); // Often missing in index
+          ); 
           const sku = String(fileAttrs.Prod_ID || fileAttrs.prod_id || "");
 
           if (icecatId && sku) {
