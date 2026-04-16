@@ -78,7 +78,7 @@ describe("LaptopDiscoveryJob", () => {
     ]);
     (mockSkuRepo.findBySkuNumber as any).mockImplementation(async () => null);
     (mockIcecat.getProductSpecs as any).mockImplementation(
-      async () => mockSpecs,
+      async () => ({ specs: mockSpecs, marketingName: "Spectre x360" }),
     );
     (mockLineRepo.upsert as any).mockImplementation(async () => "new-line-id");
 
@@ -95,6 +95,8 @@ describe("LaptopDiscoveryJob", () => {
       "new-line-id",
       "Spectre-x360",
       mockSpecs,
+      null,
+      "Spectre x360"
     );
   });
 
@@ -130,7 +132,7 @@ describe("LaptopDiscoveryJob", () => {
     
     await job.run(new Date(), 2);
 
-    expect(mockIcecat.getDiscoveryIndex).toHaveBeenCalledWith(expect.any(Date), 2);
+    expect(mockIcecat.getDiscoveryIndex).toHaveBeenCalledWith(expect.any(Date), 100);
     // Since getDiscoveryIndex handles the limit, we expect it to return 2 items
   });
 });

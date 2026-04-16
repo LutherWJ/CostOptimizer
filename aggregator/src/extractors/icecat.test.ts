@@ -22,12 +22,14 @@ describe("IcecatService Integration", () => {
     const sku = "82WQ002RUS";
 
     console.log(`Fetching real data for ${brand} ${sku}...`);
-    const specs = await service.getProductSpecs(brand, sku);
+    const result = await service.getProductSpecs(brand, sku);
 
-    expect(specs).not.toBeNull();
+    expect(result).not.toBeNull();
 
-    if (specs) {
+    if (result) {
+      const { specs, marketingName } = result;
       console.log("Real Specs Received:", JSON.stringify(specs, null, 2));
+      console.log("Marketing Name:", marketingName);
 
       // Basic assertions to ensure the mapping is working on real fields
       expect(specs.cpu_family).toBeDefined();

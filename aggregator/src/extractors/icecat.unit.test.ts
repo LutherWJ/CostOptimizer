@@ -8,7 +8,7 @@ describe("IcecatService Unit Tests", () => {
     it("should correctly extract laptop SKUs from a mock XML stream", async () => {
       // Mock XML using the real casing we found (Catid, Prod_ID, etc.)
       const mockXml = `
-        <file Product_ID="123" Supplier_name="HP" Prod_ID="HP-SKU-1" Catid="151" Updated="20230101000000"/>
+        <file Product_ID="90000001" Supplier_name="HP" Prod_ID="HP-SKU-1" Catid="151" Updated="20230101000000"/>
         <file Product_ID="456" Supplier_name="Dell" Prod_ID="DELL-SKU-1" Catid="151" Updated="20210101000000"/>
         <file Product_ID="789" Supplier_name="Asus" Prod_ID="ASUS-SKU-1" Catid="999" Updated="20230101000000"/>
       `;
@@ -44,13 +44,13 @@ describe("IcecatService Unit Tests", () => {
       const firstResult = results[0]!;
       expect(firstResult.sku).toBe("HP-SKU-1");
       expect(firstResult.brand).toBe("HP");
-      expect(firstResult.icecatId).toBe("123");
+      expect(firstResult.icecatId).toBe("90000001");
 
       global.fetch = originalFetch;
     });
 
     it("should handle tags split across chunks", async () => {
-      const part1 = '<file Product_ID="123" Supplier_name="HP" Prod_ID="HP-SKU-1" ';
+      const part1 = '<file Product_ID="90000001" Supplier_name="HP" Prod_ID="HP-SKU-1" ';
       const part2 = 'Catid="151" Updated="20230101000000"/>';
 
       const originalFetch = global.fetch;

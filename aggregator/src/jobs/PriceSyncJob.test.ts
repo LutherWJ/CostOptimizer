@@ -42,6 +42,7 @@ describe("PriceSyncJob", () => {
       id: "sku-123",
       product_line_id: "line-456",
       sku_number: "XPS13-9315",
+      marketing_name: "XPS 13 9315",
     };
 
     const mockLine = {
@@ -65,7 +66,7 @@ describe("PriceSyncJob", () => {
 
     expect(mockSkuRepo.findAllActive).toHaveBeenCalled();
     expect(mockLineRepo.findById).toHaveBeenCalledWith("line-456");
-    expect(mockProvider.getLatestPrice).toHaveBeenCalledWith("Dell", "XPS13-9315");
+    expect(mockProvider.getLatestPrice).toHaveBeenCalledWith("Dell", "XPS13-9315", "XPS 13 9315");
     expect(mockPriceRepo.add).toHaveBeenCalledWith({
       laptop_sku_id: "sku-123",
       vendor: "MockVendor",

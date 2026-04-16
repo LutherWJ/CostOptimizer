@@ -17,9 +17,17 @@ export class OllamaService {
     } else if (process.env.OLLAMA_URL) {
       this.baseUrl = process.env.OLLAMA_URL;
     } else if (process.env.OLLAMA_HOSTNAME) {
-      const host = process.env.OLLAMA_HOSTNAME.trim();
+      let host = process.env.OLLAMA_HOSTNAME.trim();
       const port = (process.env.OLLAMA_PORT || "11434").toString().trim();
-      this.baseUrl = `http://${host}:${port}`;
+      
+      // If host already has protocol, don't add it
+      const protocol = host.includes("://") ? "" : "http://";
+      
+      // If host already has a port (contains a colon after the initial protocol), don't append another one
+      const hostPart = host.split("://").pop() || host;
+      const hasPort = hostPart.includes(":");
+      
+      this.baseUrl = hasPort ? `${protocol}${host}` : `${protocol}${host}:${port}`;
     } else {
       this.baseUrl = "http://localhost:11434";
     }
