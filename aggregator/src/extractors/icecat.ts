@@ -128,7 +128,7 @@ export class IcecatService implements IIcecatService {
 
           // Skip vintage models (Low Icecat IDs) - Modern ones are usually > 10,000,000
           // This avoids the "empty specs" problem with archived products.
-          if (parseInt(icecatId) < 1000000) continue;
+          if (parseInt(icecatId) < 10000000) continue;
 
           const brand = String(
             fileAttrs.Supplier_name || fileAttrs.supplier_name || "",
