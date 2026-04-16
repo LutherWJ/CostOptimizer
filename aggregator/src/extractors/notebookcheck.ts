@@ -22,11 +22,17 @@ export class NotebookcheckExtractor implements IBenchmarkProvider {
       preNavigationHooks: [
         (_context, gotOptions) => {
           gotOptions.http2 = false;
+          gotOptions.headers = {
+            ...gotOptions.headers,
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
+            "Accept-Language": "en-US,en;q=0.9",
+          };
         },
       ],
       async requestHandler({ $, request }) {
         const url = request.url;
-        log.info(`Processing ${url}...`);
+        logger.info(`Processing ${url}...`);
 
         const isGPU = url.includes("Graphics-Cards");
         const componentType: "CPU" | "GPU" = isGPU ? "GPU" : "CPU";
