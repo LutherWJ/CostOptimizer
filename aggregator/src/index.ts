@@ -13,6 +13,8 @@ import { PriceSyncJob } from "./jobs/PriceSyncJob";
 import { BenchmarkSyncJob } from "./jobs/BenchmarkSyncJob";
 import { SuitabilityJob } from "./jobs/SuitabilityJob";
 import { NotebookcheckExtractor } from "./extractors/notebookcheck";
+import { OllamaService } from "./extractors/OllamaService";
+import { AliasSyncJob } from "./jobs/AliasSyncJob";
 import { logger } from "./utils/logger";
 
 const main = async () => {
@@ -30,6 +32,7 @@ const main = async () => {
   const icecat = new IcecatService();
   const serpapi = new SerpApiService();
   const notebookcheck = new NotebookcheckExtractor();
+  const ollama = new OllamaService();
 
   try {
     switch (command) {
@@ -61,6 +64,12 @@ const main = async () => {
         const providers = [notebookcheck];
         const benchmarkSyncJob = new BenchmarkSyncJob(providers, benchmarkRepo);
         await benchmarkSyncJob.run();
+        break;
+      }
+
+      case "sync-aliases": {
+        const aliasSyncJob = new AliasSyncJob(skuRepo, benchmarkRepo, ollama);
+        await aliasSyncJob.run();
         break;
       }
 
@@ -133,6 +142,7 @@ Available commands:
   discover [year] [limit] - Import laptops updated since [year].
   sync-prices             - Update latest prices from e-commerce.
   sync-benchmarks         - Sync CPU/GPU scores from Notebookcheck.
+  sync-aliases            - Use LLM to map generic specs to specific benchmarks.
   update-value            - Map laptops to workloads based on specs and benchmarks.
   refresh-view            - Update the materialized view for the app.
   init-aliases            - Initialize the aliases DB tables.

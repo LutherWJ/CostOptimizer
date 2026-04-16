@@ -1,35 +1,32 @@
 import { db } from "./repositories/connection";
-import { WORKLOAD_DEFINITIONS } from "./config/workloads";
 import { logger } from "./utils/logger";
 
-async function cleanup() {
+async function purgeAllData() {
   try {
-    // Calculate absolute minimum requirements from workload definitions
-    const minRamRequired = Math.min(...WORKLOAD_DEFINITIONS.map(w => w.min_specs.ram_gb));
-    const minStorageRequired = Math.min(...WORKLOAD_DEFINITIONS.map(w => w.min_specs.storage_gb || 0));
+    logger.info("--- FULL DATABASE PURGE ---");
+    logger.info("Clearing all laptop, pricing, and suitability data...");
 
-    logger.info(`Cleaning up obsolete hardware...`);
-    logger.info(`Criteria: RAM < ${minRamRequired}GB OR Storage < ${minStorageRequired}GB`);
-
-    // In PostgreSQL, we can query JSONB fields using ->> operator and cast to integer
-    const result = await db`
-      DELETE FROM laptop_skus 
-      WHERE (hardware_specs->>'ram_gb')::int < ${minRamRequired} 
-         OR (hardware_specs->>'storage_gb')::int < ${minStorageRequired}
-      RETURNING sku_number;
+    // We use TRUNCATE with CASCADE to handle foreign key dependencies in the correct order
+    // This clears everything EXCEPT the benchmarks and their aliases
+    await db`
+      TRUNCATE TABLE 
+        sku_aliases, 
+        sku_suitability, 
+        price_history, 
+        laptop_skus, 
+        product_lines 
+      RESTART IDENTITY CASCADE;
     `;
 
-    logger.info(`Successfully deleted ${result.length} obsolete laptops from the database.`);
-    if (result.length > 0) {
-      const deletedSkus = result.map((r: any) => r.sku_number).join(", ");
-      logger.info(`Deleted SKUs: ${deletedSkus}`);
-    }
+    logger.info("✅ Successfully cleared all imported data.");
+    logger.info("You can now safely run 'discover' to seed with improved metadata.");
 
   } catch (err: any) {
-    logger.error("Cleanup failed:", err.message);
+    logger.error("Purge failed:", err.message);
   } finally {
+    await db.close();
     process.exit(0);
   }
 }
 
-cleanup();
+purgeAllData();

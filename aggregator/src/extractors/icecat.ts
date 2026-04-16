@@ -238,18 +238,22 @@ export class IcecatService implements IIcecatService {
       }
     }
 
+    const cpuModel = features["Processor model"]?.value;
+    const cpuFamily = features["Processor family"]?.value;
+
     const specs: HardwareSpecs = {
-      cpu_family:
-        features["Processor family"]?.value ||
-        features["Processor model"]?.value ||
-        "Unknown",
+      cpu_family: (cpuModel || cpuFamily || "Unknown")
+        .replace(/[™®]/g, "")
+        .trim(),
       cpu_cores: this.parseNumeric(features["Processor cores"]),
       ram_gb: this.parseNumeric(features["Internal memory"]) || 0,
       storage_gb: this.parseNumeric(features["Total storage capacity"]) || 0,
 
-      gpu_model:
+      gpu_model: (
         features["Discrete graphics card model"]?.value ||
-        features["On-board graphics card model"]?.value,
+        features["On-board graphics card model"]?.value ||
+        "Integrated"
+      ).replace(/[™®]/g, "").trim(),
       gpu_type:
         features["Discrete graphics card model"] &&
         features["Discrete graphics card model"].value !== "Not available"

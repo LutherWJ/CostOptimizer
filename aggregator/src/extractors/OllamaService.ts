@@ -26,13 +26,7 @@ export class OllamaService {
     this.model = model;
   }
 
-  async extractProductDetails(rawTitle: string): Promise<OllamaExtractionResult | null> {
-    const prompt = `You are an expert at identifying computer hardware. Extract the Brand, Product Line, and exact Manufacturer Part Number (MPN/SKU) from the following raw e-commerce title. Output strictly in JSON format with the keys "brand", "line", and "sku". If a value cannot be found, use null.
-    
-Raw Title: "${rawTitle}"
-
-JSON Output:`;
-
+  async generate(prompt: string, json: boolean = false): Promise<string | null> {
     try {
       const response = await fetch(`${this.baseUrl}/api/generate`, {
         method: "POST",
@@ -43,7 +37,7 @@ JSON Output:`;
           model: this.model,
           prompt: prompt,
           stream: false,
-          format: "json",
+          format: json ? "json" : undefined,
         }),
       });
 
@@ -53,15 +47,32 @@ JSON Output:`;
       }
 
       const data = await response.json();
-      const parsed = JSON.parse(data.response);
-      
+      return data.response;
+    } catch (error) {
+      console.error("Failed to communicate with Ollama:", error);
+      return null;
+    }
+  }
+
+  async extractProductDetails(rawTitle: string): Promise<OllamaExtractionResult | null> {
+    const prompt = `You are an expert at identifying computer hardware. Extract the Brand, Product Line, and exact Manufacturer Part Number (MPN/SKU) from the following raw e-commerce title. Output strictly in JSON format with the keys "brand", "line", and "sku". If a value cannot be found, use null.
+    
+Raw Title: "${rawTitle}"
+
+JSON Output:`;
+
+    const response = await this.generate(prompt, true);
+    if (!response) return null;
+
+    try {
+      const parsed = JSON.parse(response);
       return {
         brand: parsed.brand || null,
         line: parsed.line || null,
         sku: parsed.sku || null,
       };
-    } catch (error) {
-      console.error("Failed to communicate with Ollama:", error);
+    } catch (e) {
+      console.error("Failed to parse Ollama JSON response:", e);
       return null;
     }
   }
