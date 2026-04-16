@@ -240,11 +240,15 @@ export class IcecatService implements IIcecatService {
 
     const cpuModel = features["Processor model"]?.value;
     const cpuFamily = features["Processor family"]?.value;
+    
+    // Construct a full CPU name (e.g., "Intel Core i7 1355U" instead of just "1355U")
+    let cpuName = cpuModel || cpuFamily || "Unknown";
+    if (cpuFamily && cpuModel && !cpuModel.toLowerCase().includes(cpuFamily.toLowerCase())) {
+      cpuName = `${cpuFamily} ${cpuModel}`;
+    }
 
     const specs: HardwareSpecs = {
-      cpu_family: (cpuModel || cpuFamily || "Unknown")
-        .replace(/[™®]/g, "")
-        .trim(),
+      cpu_family: cpuName.replace(/[™®]/g, "").trim(),
       cpu_cores: this.parseNumeric(features["Processor cores"]),
       ram_gb: this.parseNumeric(features["Internal memory"]) || 0,
       storage_gb: this.parseNumeric(features["Total storage capacity"]) || 0,

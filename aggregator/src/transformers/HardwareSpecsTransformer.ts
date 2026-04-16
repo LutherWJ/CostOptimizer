@@ -11,14 +11,33 @@ export class HardwareSpecsTransformer {
 
   /**
    * Cleans and canonicalizes brand and product line names.
-   * For example, it might turn "LENOVO" into "Lenovo" or "Apple Inc." into "Apple".
    */
-  canonicalizeBrand(brand: string | undefined, specs: any): string {
-    const rawBrand = brand || (specs as any)._brandName || "Unknown";
+  canonicalizeBrand(indexBrand: string | undefined, specs: any): string {
+    // Prioritize the brand name found inside the detailed specs over the index (supplier) name
+    const specBrand = (specs as any)._brandName;
+    const rawBrand = specBrand || indexBrand || "Unknown";
     
-    // Example: Basic cleanup
     let canonical = rawBrand.trim();
-    if (canonical.toLowerCase() === "apple inc.") canonical = "Apple";
+
+    // List of known resellers/refurbishers to ignore if we have a better name
+    const resellers = ["flex it", "upcycle it", "bsi-refurbished", "bsi", "refurbished"];
+    if (resellers.includes(canonical.toLowerCase()) && specBrand) {
+      canonical = specBrand.trim();
+    }
+
+    // Standardize common brands
+    const mapping: Record<string, string> = {
+      "apple inc.": "Apple",
+      "dell technologies": "Dell",
+      "hewlett packard": "HP",
+      "asustek computer": "ASUS",
+      "lenovo group limited": "Lenovo"
+    };
+
+    const lower = canonical.toLowerCase();
+    for (const [key, value] of Object.entries(mapping)) {
+      if (lower.includes(key)) return value;
+    }
     
     return canonical;
   }
