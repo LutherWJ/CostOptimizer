@@ -15,6 +15,7 @@ import { SuitabilityJob } from "./jobs/SuitabilityJob";
 import { NotebookcheckExtractor } from "./extractors/notebookcheck";
 import { OllamaService } from "./extractors/OllamaService";
 import { AliasSyncJob } from "./jobs/AliasSyncJob";
+import { RepairJob } from "./jobs/RepairJob";
 import { logger } from "./utils/logger";
 
 const main = async () => {
@@ -70,6 +71,12 @@ const main = async () => {
       case "sync-aliases": {
         const aliasSyncJob = new AliasSyncJob(skuRepo, benchmarkRepo, ollama);
         await aliasSyncJob.run();
+        break;
+      }
+
+      case "repair-data": {
+        const repairJob = new RepairJob(skuRepo, lineRepo, ollama);
+        await repairJob.run();
         break;
       }
 
@@ -143,6 +150,7 @@ Available commands:
   sync-prices             - Update latest prices from e-commerce.
   sync-benchmarks         - Sync CPU/GPU scores from Notebookcheck.
   sync-aliases            - Use LLM to map generic specs to specific benchmarks.
+  repair-data             - Fix reseller branding and identify integrated GPUs.
   update-value            - Map laptops to workloads based on specs and benchmarks.
   refresh-view            - Update the materialized view for the app.
   init-aliases            - Initialize the aliases DB tables.
