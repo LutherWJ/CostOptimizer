@@ -29,7 +29,7 @@ export class RepairJob {
         const prompt = `Identify the actual manufacturer (Dell, HP, Lenovo, Apple, ASUS, Acer, Microsoft) from this SKU: "${sku.sku_number}". Respond with ONLY the brand name. If unsure, respond with "Unknown".`;
         const realBrand = await this.ollama.generate(prompt);
         
-        if (realBrand && realBrand.trim() !== "Unknown" && realBrand.length < 20) {
+        if (realBrand && realBrand.trim() !== "Unknown" && realBrand.length < 20 && !realBrand.includes("!")) {
           const cleanBrand = realBrand.trim();
           logger.info(`[Repair] Re-branding SKU ${sku.sku_number}: ${currentBrand} -> ${cleanBrand}`);
           
@@ -41,12 +41,13 @@ export class RepairJob {
         }
       }
 
-      // 2. Repair "Integrated" GPUs
-      if (specs.gpu_model?.toLowerCase() === "integrated" || !specs.gpu_model) {
+      // 2. Repair generic or missing GPUs
+      const currentGpu = specs.gpu_model?.toLowerCase() || "";
+      if (!currentGpu || currentGpu === "integrated" || currentGpu === "not available") {
         const prompt = `Identify the specific integrated GPU model for this CPU: "${specs.cpu_family}". Respond with ONLY the GPU name (e.g., "Intel Iris Xe Graphics", "AMD Radeon 780M").`;
         const gpuModel = await this.ollama.generate(prompt);
         
-        if (gpuModel && gpuModel.length > 5 && gpuModel.length < 50) {
+        if (gpuModel && gpuModel.length > 5 && gpuModel.length < 50 && !gpuModel.includes("!")) {
           logger.info(`[Repair] Identified GPU for ${specs.cpu_family}: ${gpuModel.trim()}`);
           specs.gpu_model = gpuModel.trim();
           sku.hardware_specs = specs;

@@ -33,6 +33,7 @@ export class LaptopSkuRepository {
       )
       ON CONFLICT (sku_number) 
       DO UPDATE SET 
+        product_line_id = EXCLUDED.product_line_id,
         hardware_specs = EXCLUDED.hardware_specs,
         qualitative_data = COALESCE(EXCLUDED.qualitative_data, laptop_skus.qualitative_data)
       RETURNING id;
