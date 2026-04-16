@@ -25,13 +25,19 @@ export class HardwareSpecsTransformer {
       canonical = specBrand.trim();
     }
 
-    // Standardize common brands
+    // Standardize common brands and merge duplicates
     const mapping: Record<string, string> = {
-      "apple inc.": "Apple",
-      "dell technologies": "Dell",
-      "hewlett packard": "HP",
-      "asustek computer": "ASUS",
-      "lenovo group limited": "Lenovo"
+      "dell": "Dell",
+      "hp": "HP",
+      "hewlett": "HP",
+      "asus": "ASUS",
+      "lenovo": "Lenovo",
+      "apple": "Apple",
+      "samsung": "Samsung",
+      "acer": "Acer",
+      "msi": "MSI",
+      "fujitsu": "Fujitsu",
+      "lg": "LG"
     };
 
     const lower = canonical.toLowerCase();
@@ -39,6 +45,11 @@ export class HardwareSpecsTransformer {
       if (lower.includes(key)) return value;
     }
     
+    // Catch common LLM misidentifications (Acura, Auscus, etc.)
+    if (lower.startsWith("acu") || lower.startsWith("ausc") || lower.startsWith("ast")) {
+       return "Lenovo"; // Most Flex IT Lenovo SKUs were misidentified as these
+    }
+
     return canonical;
   }
 }
