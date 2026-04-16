@@ -119,25 +119,37 @@ const main = async () => {
       }
 
       case "weekly-cron": {
-        logger.info("Starting discover step");
-        // Discover
-        const sinceYear = 2022;
+        logger.info("Starting weekly maintenance...");
+        
+        // 1. Discover
+        logger.info("Step 1: Discovering new laptops...");
+        const sinceYear = 2024;
         const sinceDate = new Date(`${sinceYear}-01-01`);
         const discoveryJob = new LaptopDiscoveryJob(icecat, skuRepo, lineRepo);
         await discoveryJob.run(sinceDate);
 
-        // Sync Benchmarks
-        logger.info("Starting benchmark scraping");
+        // 2. Repair Data (Fix branding/Integrated GPUs)
+        logger.info("Step 2: Repairing metadata...");
+        const repairJob = new RepairJob(skuRepo, lineRepo, ollama);
+        await repairJob.run();
+
+        // 3. Sync Benchmarks
+        logger.info("Step 3: Scraping performance benchmarks...");
         const providers = [notebookcheck];
         const benchmarkSyncJob = new BenchmarkSyncJob(providers, benchmarkRepo);
         await benchmarkSyncJob.run();
 
-        logger.info("Starting value processing");
-        // Suitability
+        // 4. Sync Aliases (Map components to benchmarks)
+        logger.info("Step 4: Mapping components to benchmarks...");
+        const aliasSyncJob = new AliasSyncJob(skuRepo, benchmarkRepo, ollama);
+        await aliasSyncJob.run();
+
+        // 5. Suitability
+        logger.info("Step 5: Updating suitability and value scores...");
         const suitabilityJob = new SuitabilityJob(skuRepo, workloadRepo);
         await suitabilityJob.run();
 
-        logger.info("Weekly cron job completed.");
+        logger.info("Weekly maintenance completed successfully.");
         break;
       }
 
