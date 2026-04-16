@@ -1,5 +1,4 @@
 import { IcecatService } from "./extractors/icecat";
-import { EbayService } from "./extractors/ebay";
 import { SerpApiService } from "./extractors/serpapi";
 import {
   LaptopSkuRepository,
@@ -29,7 +28,6 @@ const main = async () => {
 
   // Initialize Services
   const icecat = new IcecatService();
-  const ebay = new EbayService();
   const serpapi = new SerpApiService();
   const notebookcheck = new NotebookcheckExtractor();
 
@@ -48,7 +46,7 @@ const main = async () => {
       }
 
       case "sync-prices": {
-        const providers = [ebay, serpapi];
+        const providers = [serpapi];
         const priceSyncJob = new PriceSyncJob(
           providers,
           skuRepo,
@@ -89,7 +87,7 @@ const main = async () => {
 
       case "daily-cron": {
         logger.info("Starting daily cron job (Sync Prices -> Refresh View)...");
-        const providers = [ebay, serpapi];
+        const providers = [serpapi];
         const priceSyncJob = new PriceSyncJob(
           providers,
           skuRepo,
