@@ -205,10 +205,14 @@ export class IcecatService implements IIcecatService {
     brand: string,
     sku: string,
     icecatId?: string,
-  ): Promise<HardwareSpecs | null> {
+  ): Promise<{ specs: HardwareSpecs, marketingName: string } | null> {
     const rawData = await this.getRawProductData(brand, sku, icecatId);
     if (!rawData || !rawData.data) return null;
-    return this.mapIcecatToHardwareSpecs(rawData);
+    
+    return {
+      specs: this.mapIcecatToHardwareSpecs(rawData),
+      marketingName: rawData.data.GeneralInfo.ProductName || rawData.data.GeneralInfo.ModelName || ""
+    };
   }
 
   private mapIcecatToHardwareSpecs(data: IcecatProductResponse): HardwareSpecs {

@@ -35,9 +35,10 @@ export class PriceSyncJob {
       const brand = productLine?.manufacturer || "Unknown";
 
       for (const provider of this.providers) {
-        logger.info(`[${provider.vendorName}] Fetching price for ${brand} ${sku.sku_number}...`);
+        const searchQuery = sku.marketing_name || sku.sku_number;
+        logger.info(`[${provider.vendorName}] Fetching price for ${brand} ${searchQuery}...`);
         
-        const result = await provider.getLatestPrice(brand, sku.sku_number);
+        const result = await provider.getLatestPrice(brand, sku.sku_number, sku.marketing_name);
         
         if (result) {
           // Transformation logic delegated

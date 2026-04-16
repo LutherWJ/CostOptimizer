@@ -49,7 +49,7 @@ export interface PriceResult {
 
 export interface IPriceProvider {
   vendorName: string;
-  getLatestPrice(brand: string, sku: string): Promise<PriceResult | null>;
+  getLatestPrice(brand: string, sku: string, marketingName?: string): Promise<PriceResult | null>;
 }
 
 export interface IEbayService extends IPriceProvider {
@@ -96,7 +96,7 @@ export interface IcecatIndexItem {
 }
 
 export interface IIcecatService {
-  getProductSpecs(brand: string, sku: string, icecatId?: string): Promise<HardwareSpecs | null>;
+  getProductSpecs(brand: string, sku: string, icecatId?: string): Promise<{ specs: HardwareSpecs, marketingName: string } | null>;
   getRawProductData(brand: string, sku: string, icecatId?: string): Promise<IcecatProductResponse | null>;
   getDiscoveryIndex(sinceDate: Date, limit?: number): Promise<IcecatIndexItem[]>;
 }

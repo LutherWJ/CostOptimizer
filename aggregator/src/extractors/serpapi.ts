@@ -39,14 +39,15 @@ export class SerpApiService implements IPriceProvider {
    * Fetches the latest prices from Google Shopping using SerpApi.
    * Documentation: https://serpapi.com/google-shopping-results
    */
-  async getLatestPrice(brand: string, sku: string): Promise<PriceResult | null> {
+  async getLatestPrice(brand: string, sku: string, marketingName?: string): Promise<PriceResult | null> {
     if (!this.apiKey) return null;
 
-    logger.info(`[SerpApi] Searching for: ${brand} ${sku}...`);
+    const queryTerm = marketingName ? `${brand} ${marketingName}` : `${brand} ${sku}`;
+    logger.info(`[SerpApi] Searching for: ${queryTerm}...`);
 
     const params = new URLSearchParams({
       engine: "google_shopping",
-      q: `${brand} ${sku}`,
+      q: queryTerm,
       api_key: this.apiKey,
       hl: "en",
       gl: "us",

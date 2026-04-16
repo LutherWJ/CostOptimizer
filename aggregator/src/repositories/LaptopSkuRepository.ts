@@ -5,6 +5,7 @@ export interface LaptopSku {
   id: string;
   product_line_id: string;
   sku_number: string;
+  marketing_name?: string;
   hardware_specs: HardwareSpecs;
   qualitative_data: any;
   is_active: boolean;
@@ -22,20 +23,23 @@ export class LaptopSkuRepository {
     skuNumber: string,
     hardwareSpecs: HardwareSpecs,
     qualitativeData?: any,
+    marketingName?: string
   ): Promise<string> {
     const result = await db`
-      INSERT INTO laptop_skus (product_line_id, sku_number, hardware_specs, qualitative_data)
+      INSERT INTO laptop_skus (product_line_id, sku_number, hardware_specs, qualitative_data, marketing_name)
       VALUES (
         ${productLineId}, 
         ${skuNumber}, 
         ${hardwareSpecs as any}, 
-        ${(qualitativeData || null) as any}
+        ${(qualitativeData || null) as any},
+        ${marketingName || null}
       )
       ON CONFLICT (sku_number) 
       DO UPDATE SET 
         product_line_id = EXCLUDED.product_line_id,
         hardware_specs = EXCLUDED.hardware_specs,
-        qualitative_data = COALESCE(EXCLUDED.qualitative_data, laptop_skus.qualitative_data)
+        qualitative_data = COALESCE(EXCLUDED.qualitative_data, laptop_skus.qualitative_data),
+        marketing_name = COALESCE(EXCLUDED.marketing_name, laptop_skus.marketing_name)
       RETURNING id;
     `;
 

@@ -55,37 +55,38 @@ export class LaptopDiscoveryJob {
       }
 
       try {
-        const rawSpecs = await this.icecat.getProductSpecs(item.brand, item.sku, item.icecatId);
+        const result = await this.icecat.getProductSpecs(item.brand, item.sku, item.icecatId);
         
-        if (!rawSpecs) {
+        if (!result) {
           invalidSpecsCount++;
           continue;
         }
+
+        const { specs, marketingName } = result;
 
         // 1. Validate using Transformer
-        const validation = this.transformer.validate(rawSpecs);
+        const validation = this.transformer.validate(specs);
         if (!validation.success) {
-          // Silent skip for invalid specs during discovery to keep logs clean
           invalidSpecsCount++;
           continue;
         }
-        const specs = validation.data!;
+        const validatedSpecs = validation.data!;
 
         // 2. Apply Quality Filter based on WORKLOAD_DEFINITIONS
-        if (specs.ram_gb < minRamRequired || specs.storage_gb < minStorageRequired) {
+        if (validatedSpecs.ram_gb < minRamRequired || validatedSpecs.storage_gb < minStorageRequired) {
           obsoleteSpecsCount++;
           continue;
         }
 
         // 3. Canonicalize Brand using Transformer
-        const brandName = this.transformer.canonicalizeBrand(item.brand, rawSpecs);
+        const brandName = this.transformer.canonicalizeBrand(item.brand, specs);
 
         // 4. Coordinate storage with Repositories
         const lineId = await this.lineRepo.upsert(brandName, brandName);
-        await this.skuRepo.upsert(lineId, item.sku, specs);
+        await this.skuRepo.upsert(lineId, item.sku, validatedSpecs, null, marketingName);
         
         newItemsCount++;
-        logger.info(`[${newItemsCount}] Imported ${brandName} ${item.sku} (${specs.ram_gb}GB RAM / ${specs.storage_gb}GB Storage)`);
+        logger.info(`[${newItemsCount}] Imported ${brandName} ${marketingName} (${item.sku})`);
       } catch (err) {
         logger.error(`Error processing ${item.brand} ${item.sku}:`, err);
         invalidSpecsCount++;
