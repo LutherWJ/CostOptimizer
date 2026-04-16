@@ -1,0 +1,77 @@
+/* ── FAST PATH (Hick's Law) ──────────────────────────── */
+.fp-section{
+  background:var(--teal-l);
+  border:1.5px solid rgba(10,138,120,.25);
+  border-radius:14px;
+  padding:16px 20px;
+  margin-bottom:28px;
+}
+.fp-heading{font-size:14px;font-weight:700;color:var(--ink);margin-bottom:4px;}
+.fp-sub{font-size:12px;color:var(--ink);margin-bottom:12px;line-height:1.5;}
+.fp-grid{display:flex;flex-wrap:wrap;gap:7px;}
+.fp-btn{
+  display:flex;align-items:center;gap:6px;
+  padding:8px 14px;min-height:38px;
+  border-radius:10px;border:1.5px solid rgba(10,138,120,.3);
+  background:var(--white);font-size:12px;font-weight:600;color:var(--ink);
+  cursor:pointer;transition:all .18s;
+}
+.fp-btn:hover{border-color:var(--teal);background:var(--teal-l);color:var(--teal2);}
+.fp-btn.active{border-color:var(--teal);background:var(--teal);color:#fff;}
+.fp-ico{font-size:15px;}
+.fp-reset{
+  display:none;align-items:center;gap:5px;
+  padding:7px 13px;min-height:34px;
+  border-radius:10px;border:1.5px solid var(--red);
+  background:var(--red-l);font-size:11px;font-weight:600;color:var(--red);
+  cursor:pointer;transition:all .18s;margin-top:10px;
+}
+.fp-reset:hover{background:var(--red);color:#fff;}
+.fp-reset.show{display:flex;}
+
+/* ── STEP CARD HEADINGS ──────────────────────────────── */
+.step-card h2{font-size:26px;font-weight:800;color:var(--ink);margin-bottom:6px;letter-spacing:-.3px;}
+.step-card .sub{font-size:14px;color:var(--muted);margin-bottom:20px;}
+
+/* ── WORKLOAD GROUPS ─────────────────────────────────── */
+.wl-group{margin-bottom:32px;}
+.wl-group:last-of-type{margin-bottom:0;}
+.wl-group-header{
+  display:flex;align-items:center;gap:10px;
+  margin-bottom:16px;
+}
+.wl-group-header::before,
+.wl-group-header::after{content:'';flex:1;height:1px;background:var(--border);}
+.wl-group-title{font-size:13px;font-weight:600;color:var(--ink);white-space:nowrap;}
+
+/* ── WORKLOAD CARDS ──────────────────────────────────── */
+.wl-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;}
+.wcard{
+  position:relative;
+  background:var(--white);
+  border:1.5px solid var(--border);
+  border-radius:14px;
+  padding:16px 16px 14px;
+  cursor:pointer;transition:all .15s;
+}
+.wcard:hover{border-color:var(--teal);}
+.wcard.sel{border-color:var(--teal);background:var(--teal-l);}
+.wck{
+  position:absolute;top:12px;right:12px;
+  width:18px;height:18px;border-radius:50%;
+  border:2px solid var(--border);background:var(--white);
+  transition:all .15s;
+}
+.wcard.sel .wck{background:var(--teal);border-color:var(--teal);}
+.wcard.sel .wck::after{
+  content:'';display:block;
+  width:6px;height:6px;border-radius:50%;
+  background:#fff;margin:4px auto;
+}
+.wico{font-size:20px;margin-bottom:8px;display:block;}
+.wlbl{font-size:13px;font-weight:700;color:var(--ink);line-height:1.25;margin-bottom:3px;padding-right:22px;}
+.wdsc{font-size:11.5px;color:var(--muted);line-height:1.4;}
+
+/* ── RESPONSIVE ──────────────────────────────────────── */
+@media(max-width:700px){.wl-grid{grid-template-columns:repeat(2,1fr);}}
+@media(max-width:480px){.wl-grid{grid-template-columns:1fr;}.fp-grid{flex-direction:column;}}

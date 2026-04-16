@@ -18,4 +18,4 @@ ENV http_server_port=3000
 EXPOSE 3000
 
 # Use 'bun run' to trigger the Hono server
-CMD ["bun", "run", "src/.ts"]
+CMD ["bun", "run", "src/index.ts"]
