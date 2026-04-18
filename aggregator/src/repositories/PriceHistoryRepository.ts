@@ -1,4 +1,5 @@
 import { db } from "./connection";
+import { extractId } from "./utils";
 
 export interface PriceHistoryEntry {
   id: string;
@@ -24,20 +25,7 @@ export class PriceHistoryRepository {
       RETURNING id;
     `;
 
-    if (result.length === 0) {
-      console.error(`Price history add failed for SKU ${entry.laptop_sku_id} via ${entry.vendor}. Result:`, JSON.stringify(result));
-      throw new Error(`Price history add failed for SKU ${entry.laptop_sku_id}: No rows returned`);
-    }
-
-    const row = result[0] as any;
-    const id = row.id || row.ID || row.uuid || row.UUID;
-    
-    if (!id) {
-      console.error(`Price history add returned a row but no ID column was found. Keys: ${Object.keys(row).join(", ")}`);
-      throw new Error(`Price history add failed for SKU ${entry.laptop_sku_id}: ID column missing in response`);
-    }
-
-    return id as string;
+    return extractId(result, `Price history add for SKU ${entry.laptop_sku_id}`);
   }
 
   async getLatestForSku(skuId: string): Promise<PriceHistoryEntry[]> {

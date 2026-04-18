@@ -1,4 +1,5 @@
 import { db } from "./connection";
+import { extractId, normalizeRow } from "./utils";
 
 export interface WorkloadRequirement {
   id: string;
@@ -23,33 +24,20 @@ export class WorkloadRepository {
       RETURNING id;
     `;
 
-    if (result.length === 0) {
-      console.error(`Workload upsert failed for ${name}. Result:`, JSON.stringify(result));
-      throw new Error(`Workload upsert failed for ${name}: No rows returned`);
-    }
-
-    const row = result[0] as any;
-    const id = row.id || row.ID || row.uuid || row.UUID;
-    
-    if (!id) {
-      console.error(`Workload upsert returned a row but no ID column was found. Keys: ${Object.keys(row).join(", ")}`);
-      throw new Error(`Workload upsert failed for ${name}: ID column missing in response`);
-    }
-
-    return id as string;
+    return extractId(result, `Workload upsert for ${name}`);
   }
 
   async getAll(): Promise<WorkloadRequirement[]> {
     const result = await db`
       SELECT * FROM workload_requirements
     `;
-    return result as unknown as WorkloadRequirement[];
+    return (result as any[]).map(row => normalizeRow<WorkloadRequirement>(row, ["min_specs"]));
   }
 
   async findByName(name: string): Promise<WorkloadRequirement | null> {
     const result = await db`
       SELECT * FROM workload_requirements WHERE workload_name = ${name}
     `;
-    return result.length > 0 ? (result[0] as unknown as WorkloadRequirement) : null;
+    return result.length > 0 ? normalizeRow<WorkloadRequirement>(result[0], ["min_specs"]) : null;
   }
 }

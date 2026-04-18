@@ -115,24 +115,19 @@ export async function getRecommendations(params: {
       bindParams.push(maxPrice);
     }
     if (minSize !== null) {
-      whereClauses.push(`(hardware_specs->>'screen_size_in')::numeric >= $${paramIdx++}`);
+      whereClauses.push(`(hardware_specs->>'screen_size_inches')::numeric >= $${paramIdx++}`);
       bindParams.push(minSize);
     }
     if (maxSize !== null) {
-      whereClauses.push(`(hardware_specs->>'screen_size_in')::numeric <= $${paramIdx++}`);
+      whereClauses.push(`(hardware_specs->>'screen_size_inches')::numeric <= $${paramIdx++}`);
       bindParams.push(maxSize);
     }
 
-    // Workload filter: use ?& (jsonb "all keys/elements exist") with inline array literal
-    // to avoid Bun SQL array parameter serialization issues
+    // Workload filter: use JSONB containment operator (@>) instead of ?&
+    // to avoid Bun SQL positional parameter conflicts with the '?' character.
     if (workloadNames.length > 0) {
-      const arrLiteral =
-        "ARRAY[" +
-        workloadNames
-          .map(n => "'" + n.replace(/'/g, "''") + "'")
-          .join(",") +
-        "]";
-      whereClauses.push(`suitable_workloads ?& ${arrLiteral}`);
+      const jsonbLiteral = "'" + JSON.stringify(workloadNames).replace(/'/g, "''") + "'::jsonb";
+      whereClauses.push(`suitable_workloads @> ${jsonbLiteral}`);
     }
 
     const whereStr =
@@ -145,18 +140,38 @@ export async function getRecommendations(params: {
       LIMIT 60
     `;
 
-    const rows = await db.unsafe<LaptopRecommendation[]>(sql, bindParams as unknown[]);
+    const rows = await db.unsafe<any[]>(sql, bindParams as unknown[]);
 
-    // db.unsafe() returns JSONB columns as strings — parse them
-    return rows.map(row => ({
-      ...row,
-      hardware_specs: typeof row.hardware_specs === "string"
+    // Map database fields to the interface expected by the frontend
+    return rows.map(row => {
+      const rawSpecs = typeof row.hardware_specs === "string"
         ? JSON.parse(row.hardware_specs)
-        : row.hardware_specs,
-      suitable_workloads: typeof row.suitable_workloads === "string"
-        ? JSON.parse(row.suitable_workloads)
-        : row.suitable_workloads,
-    }));
+        : row.hardware_specs;
+
+      // Transform raw specs to the application's view model
+      const hardware_specs = {
+        cpu_family: rawSpecs.cpu_family,
+        gpu_model: rawSpecs.gpu_model || "Integrated Graphics",
+        ram_gb: rawSpecs.ram_gb,
+        storage_gb: rawSpecs.storage_gb,
+        cpu_cores: rawSpecs.cpu_cores || 0,
+        gpu_type: rawSpecs.gpu_type,
+        gpu_vram_gb: rawSpecs.gpu_vram_gb || 0,
+        screen_size_in: rawSpecs.screen_size_inches,
+        // Conversion logic: lbs to kg (approx)
+        weight_kg: rawSpecs.weight_lbs ? Math.round(rawSpecs.weight_lbs * 0.453592 * 10) / 10 : 1.5,
+        // Heuristic: wh to hours (approx 10Wh per hour)
+        battery_hours: rawSpecs.battery_wh ? Math.round(rawSpecs.battery_wh / 10) : 8,
+      };
+
+      return {
+        ...row,
+        hardware_specs,
+        suitable_workloads: typeof row.suitable_workloads === "string"
+          ? JSON.parse(row.suitable_workloads)
+          : row.suitable_workloads,
+      };
+    });
   } catch (error) {
     console.error("❌ Database Error:", (error as Error).message);
     throw error;
