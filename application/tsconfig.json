@@ -1,9 +1,7 @@
 {
   "compilerOptions": {
     "baseUrl": ".",
-    "paths": {
-      "@aggregator/*": ["../aggregator/src/*"]
-    },
+    "paths": {},
 
     "lib": ["ESNext"],
     "target": "ESNext",

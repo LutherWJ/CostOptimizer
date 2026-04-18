@@ -1,6 +1,9 @@
 {
   "name": "costoptimizer",
   "module": "index.ts",
+  "scripts": {
+      "start": "bun src/index.ts"
+  },
   "devDependencies": {
     "@types/bun": "latest"
   },
@@ -10,6 +13,7 @@
   "private": true,
   "type": "module",
   "dependencies": {
-    "hono": "^4.12.0"
+    "hono": "^4.12.0",
+    "pg-connection-string": "^2.12.0"
   }
 }

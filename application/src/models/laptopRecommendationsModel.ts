@@ -1,4 +1,4 @@
-import { db } from "../../../aggregator/src/repositories/connection";
+import { db } from "../utils/connection";
 
 // Maps short URL param names to full workload names stored in DB
 const WORKLOAD_NAME_MAP: Record<string, string> = {
