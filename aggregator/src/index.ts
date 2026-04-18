@@ -1,5 +1,4 @@
 import { IcecatService } from "./extractors/icecat";
-import { SerpApiService } from "./extractors/serpapi";
 import {
   LaptopSkuRepository,
   ProductLineRepository,
@@ -16,6 +15,8 @@ import { NotebookcheckExtractor } from "./extractors/notebookcheck";
 import { OllamaService } from "./extractors/OllamaService";
 import { AliasSyncJob } from "./jobs/AliasSyncJob";
 import { RepairJob } from "./jobs/RepairJob";
+import { AuditJob } from "./jobs/AuditJob";
+import { AuditRepository } from "./repositories/AuditRepository";
 import { logger } from "./utils/logger";
 
 const main = async () => {
@@ -28,10 +29,10 @@ const main = async () => {
   const priceRepo = new PriceHistoryRepository();
   const benchmarkRepo = new ComponentBenchmarkRepository();
   const workloadRepo = new WorkloadRepository();
+  const auditRepo = new AuditRepository();
 
   // Initialize Services
   const icecat = new IcecatService();
-  const serpapi = new SerpApiService();
   const notebookcheck = new NotebookcheckExtractor();
   const ollama = new OllamaService();
 
@@ -50,9 +51,7 @@ const main = async () => {
       }
 
       case "sync-prices": {
-        const providers = [serpapi];
         const priceSyncJob = new PriceSyncJob(
-          providers,
           skuRepo,
           lineRepo,
           priceRepo,
@@ -93,6 +92,12 @@ const main = async () => {
         break;
       }
 
+      case "audit": {
+        const auditJob = new AuditJob(auditRepo);
+        await auditJob.run();
+        break;
+      }
+
       case "init-aliases": {
         logger.info("Initializing alias schema...");
         const { AliasRepository } = await import("./repositories/AliasRepository");
@@ -103,9 +108,7 @@ const main = async () => {
 
       case "daily-cron": {
         logger.info("Starting daily cron job (Sync Prices -> Refresh View)...");
-        const providers = [serpapi];
         const priceSyncJob = new PriceSyncJob(
-          providers,
           skuRepo,
           lineRepo,
           priceRepo,
@@ -144,10 +147,19 @@ const main = async () => {
         const aliasSyncJob = new AliasSyncJob(skuRepo, benchmarkRepo, ollama);
         await aliasSyncJob.run();
 
-        // 5. Suitability
-        logger.info("Step 5: Updating suitability and value scores...");
+        // 5. Sync Prices (Mock)
+        logger.info("Step 5: Generating mock market prices...");
+        const priceSyncJob = new PriceSyncJob(skuRepo, lineRepo, priceRepo);
+        await priceSyncJob.run();
+
+        // 6. Suitability
+        logger.info("Step 6: Updating suitability mappings...");
         const suitabilityJob = new SuitabilityJob(skuRepo, workloadRepo);
         await suitabilityJob.run();
+
+        // 7. Refresh View
+        logger.info("Step 7: Refreshing materialized view for application...");
+        await db`REFRESH MATERIALIZED VIEW laptop_recommendations;`.execute();
 
         logger.info("Weekly maintenance completed successfully.");
         break;
@@ -165,9 +177,11 @@ Available commands:
   repair-data             - Fix reseller branding and identify integrated GPUs.
   update-value            - Map laptops to workloads based on specs and benchmarks.
   refresh-view            - Update the materialized view for the app.
+  audit                   - Perform a database quality audit.
   init-aliases            - Initialize the aliases DB tables.
   daily-cron              - Run daily maintenance (prices + view refresh).
-  weekly-cron             - Run weekly maintenance (discovery + benchmarks + value).
+  weekly-cron              - Run full maintenance (discovery + benchmarks + prices + suitability + view).
+
         `);
         process.exit(1);
     }
