@@ -7,6 +7,7 @@
   const MAX_HISTORY_MESSAGES = 24;
   const REQUEST_TIMEOUT_MS = 60000;
   const UI_MAX_CHARS = 350;
+  const STORAGE_KEY = "laptop_ai_chat_state_v1";
 
   const WL_LABELS = {
     daily: "Daily Browsing",
@@ -132,6 +133,7 @@
     sidebar.classList.toggle("open", chatOpen);
     fab.classList.toggle("hidden", chatOpen);
     document.body.classList.toggle("chat-open", chatOpen);
+    saveChatState();
   }
 
   function openChat() {
@@ -187,6 +189,73 @@
       input.style.height = "auto";
     }
     sendChatMsg(msg);
+  }
+
+  function safeParseJson(str) {
+    try {
+      return JSON.parse(str);
+    } catch (e) {
+      return null;
+    }
+  }
+
+  function getPersistableHistory() {
+    return (Array.isArray(chatHistory) ? chatHistory : [])
+      .filter((m) => m && (m.role === "user" || m.role === "assistant"))
+      .map((m) => ({ role: m.role, content: safeText(m.content) }))
+      .filter((m) => m.content)
+      .slice(-MAX_HISTORY_MESSAGES);
+  }
+
+  function saveChatState() {
+    try {
+      if (!window.localStorage) return;
+      const state = {
+        v: 1,
+        open: !!chatOpen,
+        history: getPersistableHistory(),
+        savedAt: Date.now(),
+      };
+      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    } catch (e) {
+      // ignore
+    }
+  }
+
+  function restoreChatState() {
+    try {
+      if (!window.localStorage) return;
+      const raw = window.localStorage.getItem(STORAGE_KEY);
+      if (!raw) return;
+
+      const state = safeParseJson(raw);
+      if (!state || state.v !== 1) return;
+
+      const history = Array.isArray(state.history) ? state.history : [];
+      if (!history.length) {
+        chatOpen = !!state.open;
+        ensureOpenState();
+        return;
+      }
+
+      // Load into memory first.
+      chatHistory = history
+        .filter((m) => m && (m.role === "user" || m.role === "assistant"))
+        .map((m) => ({ role: m.role, content: safeText(m.content) }))
+        .filter((m) => m.content)
+        .slice(-MAX_HISTORY_MESSAGES);
+
+      // Render into the thread (keep the greeting card that is in the HTML).
+      for (const m of chatHistory) {
+        if (m.role === "user") appendUserPill(m.content);
+        else appendAiCard({ answer: m.content, why: [], tradeoffs: [], actions: [] });
+      }
+
+      chatOpen = !!state.open;
+      ensureOpenState();
+    } catch (e) {
+      // ignore
+    }
   }
 
   function appendUserPill(text) {
@@ -335,6 +404,7 @@
     if (chatHistory.length > MAX_HISTORY_MESSAGES) {
       chatHistory = chatHistory.slice(chatHistory.length - MAX_HISTORY_MESSAGES);
     }
+    saveChatState();
 
     const typingId = "typing-" + Date.now();
     appendTypingCard(typingId);
@@ -378,6 +448,7 @@
       if (chatHistory.length > MAX_HISTORY_MESSAGES) {
         chatHistory = chatHistory.slice(chatHistory.length - MAX_HISTORY_MESSAGES);
       }
+      saveChatState();
     } catch (e) {
       removeTyping(typingId);
       appendAiCard({
@@ -462,6 +533,8 @@
       { passive: true },
     );
     window.addEventListener("touchend", () => endDrag());
+
+    restoreChatState();
   }
 
   // Expose globals for inline HTML handlers
