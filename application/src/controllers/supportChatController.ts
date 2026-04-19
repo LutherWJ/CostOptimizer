@@ -104,16 +104,28 @@ async function getWorkloadProfiles(): Promise<WorkloadRequirement[]> {
 }
 
 function truncate(text: string, max = 900): string {
-  const t = text.trim();
+  const t = fixEncodingArtifacts(text).trim();
   return t.length <= max ? t : `${t.slice(0, max)}...`;
 }
 
 function truncateHard(text: string, max: number): string {
-  const t = text.trim();
+  const t = fixEncodingArtifacts(text).trim();
   if (!Number.isFinite(max) || max <= 0) return t;
   if (t.length <= max) return t;
   if (max <= 3) return "...".slice(0, max);
   return t.slice(0, max - 3).trimEnd() + "...";
+}
+
+function fixEncodingArtifacts(text: string): string {
+  return String(text ?? "")
+    .replace(/Ã¢â‚¬â„¢/g, "'")
+    .replace(/Ã¢â‚¬Å“/g, '"')
+    .replace(/Ã¢â‚¬Â/g, '"')
+    .replace(/â€™/g, "'")
+    .replace(/â€œ/g, '"')
+    .replace(/â€/g, '"')
+    .replace(/â€”/g, "-")
+    .replace(/â€“/g, "-");
 }
 
 function joinWithLimit(parts: string[], separator: string, maxChars: number): string {
@@ -578,6 +590,7 @@ function wantsTradeoffAdvice(message: string): boolean {
   return (
     /\b(little better|better computer|better laptop)\b/.test(m) ||
     /\b(what to upgrade|which specs|what specs)\b/.test(m) ||
+    /\b(what should i upgrade|upgrade first)\b/.test(m) ||
     /\b(spend more on|prioritize)\b/.test(m)
   );
 }
@@ -630,11 +643,28 @@ function isJustOsMessage(message: string): boolean {
   return m === "windows" || m === "win" || m === "mac" || m === "macos" || m === "osx" || m === "os x";
 }
 
+function isLowSignalMessage(message: string): boolean {
+  const m = (message || "").trim().toLowerCase();
+  return (
+    m === "ok" ||
+    m === "okay" ||
+    m === "k" ||
+    m === "um" ||
+    m === "bruh" ||
+    m === "lol" ||
+    m === "test"
+  );
+}
+
 function isJustSoftwareMention(message: string, detectedKeys: string[]): boolean {
   const m = (message || "").trim();
   if (!m) return false;
   if (m.length > 40) return false;
   if (/[?!.]/.test(m)) return false;
+  if (/\b(with|for|on|in|and|or)\b/i.test(m)) return false;
+
+  const tokens = m.split(/\s+/).filter(Boolean);
+  if (tokens.length > 2) return false;
   return detectedKeys.length === 1;
 }
 
@@ -740,7 +770,10 @@ function computeConservativeMinSpecs(workloads: WorkloadRequirement[]): Record<s
   return out;
 }
 
-function formatMinSpecsForUser(specs: Record<string, any>): string {
+function formatMinSpecsForUser(
+  specs: Record<string, any>,
+  opts?: { includeScores?: boolean },
+): string {
   const lines: string[] = [];
 
   const add = (label: string, value: any) => {
@@ -772,11 +805,12 @@ function formatMinSpecsForUser(specs: Record<string, any>): string {
 
   const cpuExampleText = formatExamples(cpuExamples);
   const gpuExampleText = formatExamples(gpuExamples);
+  const includeScores = opts?.includeScores === true;
 
   if (ram != null && ram > 0) add("RAM", `${ram} GB`);
   if (storage != null && storage > 0) add("Storage", `${storage} GB`);
   if (cpuExampleText) add("CPU (examples)", cpuExampleText);
-  else if (minCpu != null && minCpu > 0) add("CPU", `score ${minCpu}+`);
+  else if (includeScores && minCpu != null && minCpu > 0) add("CPU", `score ${minCpu}+`);
   if (cores != null && cores > 0) add("CPU cores", `${cores}+`);
 
   const gpuType = String(specs.gpu_type || "").trim();
@@ -786,9 +820,9 @@ function formatMinSpecsForUser(specs: Record<string, any>): string {
     add("GPU (examples)", gpuExampleText);
   }
 
-  if (!gpuExampleText && minGpu != null && minGpu > 0) add("GPU score", `${minGpu}+`);
+  if (includeScores && !gpuExampleText && minGpu != null && minGpu > 0) add("GPU score", `${minGpu}+`);
   if (vram != null && vram > 0) add("VRAM", `${vram} GB+`);
-  add("OS", specs.os_requirement || null);
+  add("OS", osLabel(specs.os_requirement) || specs.os_requirement || null);
 
   return lines.join("\n");
 }
@@ -830,6 +864,55 @@ async function enrichSpecsWithComponentExamples(specs: Record<string, any>): Pro
   }
 
   return out;
+}
+
+function osLabel(os: unknown): string | null {
+  const v = String(os || "").toLowerCase().trim();
+  if (!v) return null;
+  if (v === "win" || v === "windows") return "Windows";
+  if (v === "mac" || v === "macos") return "macOS";
+  if (v === "any") return "Windows or macOS";
+  return v;
+}
+
+function formatSpecsInline(specs: Record<string, any>, opts?: { includeScores?: boolean }): string {
+  const includeScores = opts?.includeScores === true;
+  const parts: string[] = [];
+
+  const num = (v: any): number | null => {
+    const n = typeof v === "number" ? v : Number(v);
+    return Number.isFinite(n) ? n : null;
+  };
+
+  const ram = num(specs.ram_gb);
+  const storage = num(specs.storage_gb);
+  const cores = num(specs.cpu_cores);
+  const vram = num(specs.vram_gb);
+  const minCpu = num(specs.min_cpu_score);
+  const minGpu = num(specs.min_gpu_score);
+
+  const cpuExamples = Array.isArray(specs.cpu_examples) ? (specs.cpu_examples as unknown[]) : [];
+  const gpuExamples = Array.isArray(specs.gpu_examples) ? (specs.gpu_examples as unknown[]) : [];
+  const cpuExample = cpuExamples.map((x) => String(x || "").trim()).filter(Boolean)[0];
+  const gpuExample = gpuExamples.map((x) => String(x || "").trim()).filter(Boolean)[0];
+
+  const gpuType = String(specs.gpu_type || "").trim();
+  const os = osLabel(specs.os_requirement);
+
+  if (ram != null && ram > 0) parts.push(`RAM ${ram}GB`);
+  if (storage != null && storage > 0) parts.push(`Storage ${storage}GB`);
+  if (cores != null && cores > 0) parts.push(`CPU ${cores}+ cores`);
+  if (cpuExample) parts.push(`CPU e.g. ${cpuExample}`);
+  else if (includeScores && minCpu != null && minCpu > 0) parts.push(`CPU score ${minCpu}+`);
+
+  if (gpuType) parts.push(`GPU ${gpuType}`);
+  if (gpuExample) parts.push(`GPU e.g. ${gpuExample}`);
+  else if (includeScores && minGpu != null && minGpu > 0) parts.push(`GPU score ${minGpu}+`);
+
+  if (vram != null && vram > 0) parts.push(`VRAM ${vram}GB+`);
+  if (os) parts.push(`OS ${os}`);
+
+  return parts.join(", ");
 }
 
 function renderSoftwareNote(profile: SoftwareRequirementRow, workloads: WorkloadRequirement[]): string {
@@ -1321,6 +1404,20 @@ export async function supportChatController(c: Context) {
       );
     }
 
+    if (isLowSignalMessage(message)) {
+      const lastA = lastAssistantMessage(history);
+      const answer = lastA && /\?\s*$/.test(lastA)
+        ? "Got it. " + lastA
+        : "What software are you asking about (and are you on Windows or macOS)?";
+      return c.json(
+        {
+          answer: SUPPORT_CHAT_MAX_CHARS > 0 ? truncateHard(answer, SUPPORT_CHAT_MAX_CHARS) : answer,
+          ...(debug ? { meta: { version: SUPPORT_BOT_VERSION, path: "low-signal" } } : {}),
+        },
+        200,
+      );
+    }
+
     const softwareProfiles = await withDbRetry(() => getSoftwareProfiles());
     const workloadProfiles = await withDbRetry(() => getWorkloadProfiles());
 
@@ -1335,6 +1432,29 @@ export async function supportChatController(c: Context) {
     // Important: do NOT use history here, otherwise short follow-ups like "requirements"
     // get misclassified as "just software mention" if a software was mentioned earlier.
     const detectedSoftwareKeysInMessage = detectSoftwareKeysFromText(message, softwareProfiles);
+    const lastAssistant = lastAssistantMessage(history);
+
+    // "My school/college recommends 32GB..." style messages: handle deterministically (avoid LLM derailment).
+    const schoolRecMatch = message.match(/\b(college|school|program)\b[\s\S]{0,40}\brecommend(?:s|ed)?\b[\s\S]{0,20}\b(\d{1,3})\s*gb\b/i);
+    if (schoolRecMatch) {
+      const ram = Number(schoolRecMatch[2]);
+      const keys = detectedSoftwareKeysInMessage.length ? detectedSoftwareKeysInMessage : detectedSoftwareKeys;
+      const key = keys[0];
+      const name = key ? softwareProfiles.find((p) => p.software_key === key)?.software_name || key : "that software";
+
+      const answer =
+        Number.isFinite(ram) && ram > 0
+          ? `If your school recommends ${ram} GB RAM for ${name}, that's a good target (more headroom on bigger projects). What's your budget?`
+          : `If your school recommends more RAM for ${name}, that's usually for extra headroom on bigger projects. What's your budget?`;
+
+      return c.json(
+        {
+          answer: SUPPORT_CHAT_MAX_CHARS > 0 ? truncateHard(answer, SUPPORT_CHAT_MAX_CHARS) : answer,
+          ...(debug ? { meta: { version: SUPPORT_BOT_VERSION, path: "school-recommendation", softwareKeys: keys } } : {}),
+        },
+        200,
+      );
+    }
 
     // For broad shopping/budget questions, avoid Ollama and ask clarifiers first (unless we can answer about a specific software/workload).
     if (
@@ -1364,6 +1484,42 @@ export async function supportChatController(c: Context) {
         {
           answer: SUPPORT_CHAT_MAX_CHARS > 0 ? truncateHard(answer, SUPPORT_CHAT_MAX_CHARS) : answer,
           ...(debug ? { meta: { version: SUPPORT_BOT_VERSION, path: "os-concern" } } : {}),
+        },
+        200,
+      );
+    }
+
+    // If the bot asked "what software/major", and the user replied with it, continue with targeted advice.
+    if (
+      detectedSoftwareKeysInMessage.length > 0 &&
+      /what software|\bmajor\b/i.test(lastAssistant)
+    ) {
+      const keys = detectedSoftwareKeysInMessage.slice(0, 2);
+      const names = keys
+        .map((k) => softwareProfiles.find((p) => p.software_key === k)?.software_name || k)
+        .join(" and ");
+
+      const needsGpu = (() => {
+        const workloads: WorkloadRequirement[] = [];
+        for (const k of keys) {
+          const profile = softwareProfiles.find((p) => p.software_key === k);
+          if (!profile) continue;
+          for (const wlName of asStringArray(profile.required_workloads)) {
+            const w = workloadProfiles.find((x) => x.workload_name === wlName);
+            if (w) workloads.push(w);
+          }
+        }
+        const specs = computeConservativeMinSpecs(workloads);
+        return String(specs.gpu_type || "").toLowerCase() === "discrete";
+      })();
+
+      const answer = needsGpu
+        ? `Got it — for ${names}, prioritize a dedicated GPU first, then RAM (16 GB+), then SSD (512 GB). Whatâ€™s your budget?`
+        : `Got it — for ${names}, prioritize RAM (16 GB+) and a 512 GB SSD, then CPU. Whatâ€™s your budget?`;
+
+      return c.json(
+        {
+          answer: SUPPORT_CHAT_MAX_CHARS > 0 ? truncateHard(answer, SUPPORT_CHAT_MAX_CHARS) : answer,
         },
         200,
       );
@@ -1444,6 +1600,51 @@ export async function supportChatController(c: Context) {
       (wantsRequirementsAnswer(message) || (plan.softwareKeys.length > 0 && isCanRunQuestion(message))) &&
       !wantsUpgradeAdvice(message)
     ) {
+      const includeScores = /\b(score|benchmark|passmark)\b/i.test(message);
+
+      // If the user asked for requirements for multiple software items, do NOT collapse into one "max of everything" answer.
+      if (wantsRequirementsAnswer(message) && plan.softwareKeys.length > 1) {
+        const lines: string[] = [];
+
+        for (const key of plan.softwareKeys.slice(0, 3)) {
+          const profile = softwareProfiles.find((p) => p.software_key === key);
+          if (!profile) continue;
+
+          const matchedWorkloads = asStringArray(profile.required_workloads)
+            .map((wlName) => workloadProfiles.find((x) => x.workload_name === wlName))
+            .filter(Boolean) as WorkloadRequirement[];
+
+          const specs = computeConservativeMinSpecs(matchedWorkloads);
+          specs.os_requirement = profile.os_requirement || specs.os_requirement;
+
+          const enriched = await enrichSpecsWithComponentExamples(specs);
+          const summary = formatSpecsInline(enriched, { includeScores });
+          lines.push(`${profile.software_name}: ${summary || "No minimum specs found."}`);
+        }
+
+        const disclaimer =
+          "Note: minimum specs are the floor - bigger projects can still feel slow. If you can, aim above them.";
+        const answer = lines.length
+          ? `${lines.join("\n")}\n\n${disclaimer}`
+          : "I don't have minimum specs for that yet.";
+
+        return c.json(
+          {
+            answer: SUPPORT_CHAT_MAX_CHARS > 0 ? truncateHard(answer, SUPPORT_CHAT_MAX_CHARS) : answer,
+            ...(debug
+              ? {
+                  meta: {
+                    version: SUPPORT_BOT_VERSION,
+                    path: "direct-requirements-multi",
+                    softwareKeys: plan.softwareKeys,
+                  },
+                }
+              : {}),
+          },
+          200,
+        );
+      }
+
       const selectedWorkloads: WorkloadRequirement[] = [];
 
       for (const key of plan.softwareKeys) {
@@ -1473,7 +1674,7 @@ export async function supportChatController(c: Context) {
       if (selectedWorkloads.length > 0) {
         const specs = computeConservativeMinSpecs(selectedWorkloads);
         const enriched = await enrichSpecsWithComponentExamples(specs);
-        const body = formatMinSpecsForUser(enriched);
+        const body = formatMinSpecsForUser(enriched, { includeScores });
         const disclaimer =
           "Note: minimum specs are the floor—bigger projects can still feel slow. If you can, aim above them.";
         const answer = body
@@ -1549,14 +1750,55 @@ export async function supportChatController(c: Context) {
       );
     }
 
-    // Fast path: generic "what should I upgrade / spend more on" (answer + one optional clarifier).
-    if (wantsTradeoffAdvice(message) && (/\bspecs?\b/.test(message.toLowerCase()) || /\bupgrade\b/.test(message.toLowerCase()) || /\bbetter\b/.test(message.toLowerCase()))) {
+    // Fast path: generic "what should I upgrade / spend more on".
+    if (
+      wantsTradeoffAdvice(message) &&
+      (/\bspecs?\b/.test(message.toLowerCase()) ||
+        /\bupgrade\b/.test(message.toLowerCase()) ||
+        /\bbetter\b/.test(message.toLowerCase()))
+    ) {
+      const keys = plan.softwareKeys.slice(0, 2);
+      const names = keys
+        .map((k) => softwareProfiles.find((p) => p.software_key === k)?.software_name || k)
+        .filter(Boolean);
+
+      if (names.length) {
+        const workloads: WorkloadRequirement[] = [];
+        for (const k of keys) {
+          const profile = softwareProfiles.find((p) => p.software_key === k);
+          if (!profile) continue;
+          for (const wlName of asStringArray(profile.required_workloads)) {
+            const w = workloadProfiles.find((x) => x.workload_name === wlName);
+            if (w) workloads.push(w);
+          }
+        }
+
+        const specs = computeConservativeMinSpecs(workloads);
+        const needsGpu = String(specs.gpu_type || "").toLowerCase() === "discrete";
+
+        const answer =
+          `For ${names.join(" and ")}, prioritize ` +
+          (needsGpu ? "a dedicated GPU, then " : "") +
+          "RAM (16 GB+), then SSD (512 GB), then CPU. " +
+          "What's your budget?";
+
+        return c.json(
+          {
+            answer: SUPPORT_CHAT_MAX_CHARS > 0 ? truncateHard(answer, SUPPORT_CHAT_MAX_CHARS) : answer,
+            ...(debug
+              ? { meta: { version: SUPPORT_BOT_VERSION, path: "tradeoff-advice-targeted", softwareKeys: keys } }
+              : {}),
+          },
+          200,
+        );
+      }
+
       const answer =
         "If you want a little better than minimum, prioritize:\n" +
         "- 16 GB RAM\n" +
         "- 512 GB SSD\n" +
         "- then a better CPU\n" +
-        "A dedicated GPU only matters if you do 3D/video/gaming.\n" +
+        "A dedicated GPU mainly matters for 3D CAD/3D rendering, video editing, and gaming.\n" +
         "What software (or major) are you buying it for?";
 
       return c.json(
