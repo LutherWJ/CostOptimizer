@@ -1,4 +1,4 @@
-import { db } from "./connection";
+import { db } from "../utils/connection";
 import { extractId, normalizeRow } from "./utils";
 
 export interface WorkloadRequirement {

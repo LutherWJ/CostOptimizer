@@ -12,7 +12,9 @@ export class BenchmarkTransformer {
     return {
       name: raw.name.trim(),
       type: raw.type as "CPU" | "GPU",
-      score: Math.round(raw.score),
+      // Notebookcheck ratings are percentages (0-100). 
+      // Scale by 300 to match the 30,000 threshold scale in workloads.ts.
+      score: Math.round(raw.score * 300),
       extra_data: raw.extra_data || null
     };
   }

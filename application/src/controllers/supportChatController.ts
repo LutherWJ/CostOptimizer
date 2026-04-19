@@ -1,16 +1,16 @@
 import type { Context } from "hono";
-import { OllamaService } from "../../../aggregator/src/extractors/OllamaService";
-import { KnowledgeRepository } from "../../../aggregator/src/repositories/KnowledgeRepository";
-import { ComponentBenchmarkRepository } from "../../../aggregator/src/repositories/ComponentBenchmarkRepository";
+import { OllamaService } from "../services/OllamaService";
+import { KnowledgeRepository } from "../repositories/KnowledgeRepository";
+import { ComponentBenchmarkRepository } from "../repositories/ComponentBenchmarkRepository";
 import {
   SoftwareRequirementsRepository,
   type SoftwareRequirementRow,
-} from "../../../aggregator/src/repositories/SoftwareRequirementsRepository";
+} from "../repositories/SoftwareRequirementsRepository";
 import {
   WorkloadRepository,
   type WorkloadRequirement,
-} from "../../../aggregator/src/repositories/WorkloadRepository";
-import { reconnectDb } from "../../../aggregator/src/repositories/connection";
+} from "../repositories/WorkloadRepository";
+import { reconnectDb } from "../utils/connection";
 
 const SUPPORT_BOT_VERSION = "2026-04-18-1";
 console.log(`[SupportChat] Loaded ${SUPPORT_BOT_VERSION}`);

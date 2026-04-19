@@ -27,7 +27,12 @@ export class SuitabilityJob {
       );
       workloadIdMap.set(def.name, id);
     }
-    logger.info(`Synced ${WORKLOAD_DEFINITIONS.length} workload definitions.`);
+    
+    // 1.1 Delete orphaned workloads
+    const currentIds = Array.from(workloadIdMap.values());
+    await this.workloadRepo.deleteNotIn(currentIds);
+    
+    logger.info(`Synced ${WORKLOAD_DEFINITIONS.length} workload definitions and cleaned up orphans.`);
 
     // 2. Fetch all active SKUs with benchmarks
     const skus = await this.skuRepo.findAllWithBenchmarks();
