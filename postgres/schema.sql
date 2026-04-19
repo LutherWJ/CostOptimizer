@@ -131,20 +131,29 @@ CREATE TABLE component_aliases (
 -- It identifies the absolute "Best Deal" (lowest price) for New vs Refurbished for every active SKU.
 DROP MATERIALIZED VIEW IF EXISTS laptop_recommendations;
 CREATE MATERIALIZED VIEW laptop_recommendations AS
-WITH latest_prices AS (
-    -- Get the most recent price from every vendor for every SKU, separating New vs Refurbished
-    SELECT DISTINCT ON (laptop_sku_id, vendor, is_refurbished)
-        laptop_sku_id,
-        vendor,
-        price_usd,
-        purchase_url,
-        is_refurbished,
-        recorded_at
+WITH latest_sync_batch AS (
+    -- Identify the most recent time a price was recorded for each SKU
+    SELECT laptop_sku_id, MAX(recorded_at) as last_sync
     FROM price_history
-    ORDER BY laptop_sku_id, vendor, is_refurbished, recorded_at DESC
+    GROUP BY laptop_sku_id
+),
+latest_prices AS (
+    -- Only consider prices that were part of the absolute most recent sync run for that SKU.
+    -- This prevents the view from picking a cheaper but stale price from a previous run.
+    SELECT DISTINCT ON (ph.laptop_sku_id, ph.vendor, ph.is_refurbished)
+        ph.laptop_sku_id,
+        ph.vendor,
+        ph.price_usd,
+        ph.purchase_url,
+        ph.is_refurbished,
+        ph.recorded_at
+    FROM price_history ph
+    JOIN latest_sync_batch lsb ON ph.laptop_sku_id = lsb.laptop_sku_id
+    WHERE ph.recorded_at >= lsb.last_sync - INTERVAL '10 minutes'
+    ORDER BY ph.laptop_sku_id, ph.vendor, ph.is_refurbished, ph.recorded_at DESC
 ),
 best_deals AS (
-    -- Of those latest prices, pick the single cheapest one for EACH condition (New vs Refurbished)
+    -- Of those recent prices, pick the absolute cheapest one for EACH condition (New vs Refurbished)
     SELECT DISTINCT ON (laptop_sku_id, is_refurbished)
         laptop_sku_id,
         vendor,
