@@ -12,7 +12,7 @@ app.use("*", logger());
 
 const publicRoot = `${import.meta.dir}/..`;
 app.use("/public/*", serveStatic({ root: publicRoot }));
-app.use("/images/*", serveStatic({ root: `${import.meta.dir}/images` }));
+app.use("/images/*", serveStatic({ root: import.meta.dir }));
 
 app.get("/", getHome);
 app.get("/workloads", workloadsController);

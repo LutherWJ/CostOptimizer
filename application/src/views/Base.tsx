@@ -26,7 +26,7 @@ const Base = (content: string, title = "App", extraCss: string[] = [], extraJs: 
 
   <!-- AI DECISION PANEL -->
   <button id="chatFab" onclick="toggleChat(event)" title="Ask LapTop AI" type="button">
-    <img src="/images/robert2.png" alt="AI bot" onerror="this.style.display='none'">
+    <img src="/images/robert2.png" alt="AI bot">
     Ask AI
   </button>
 
