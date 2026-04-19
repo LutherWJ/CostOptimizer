@@ -6,6 +6,8 @@ import {
   PriceHistoryRepository,
   ComponentBenchmarkRepository,
   WorkloadRepository,
+  KnowledgeRepository,
+  SoftwareRequirementsRepository,
   db,
 } from "./repositories";
 import { LaptopDiscoveryJob } from "./jobs/LaptopDiscoveryJob";
@@ -16,7 +18,13 @@ import { NotebookcheckExtractor } from "./extractors/notebookcheck";
 import { OllamaService } from "./extractors/OllamaService";
 import { AliasSyncJob } from "./jobs/AliasSyncJob";
 import { RepairJob } from "./jobs/RepairJob";
+import { KnowledgeIngestJob } from "./jobs/KnowledgeIngestJob";
+import { DbKnowledgeIngestJob } from "./jobs/DbKnowledgeIngestJob";
+import { WorkloadSyncJob } from "./jobs/WorkloadSyncJob";
+import { DbDocsExportJob } from "./jobs/DbDocsExportJob";
+import { SoftwareSyncJob } from "./jobs/SoftwareSyncJob";
 import { logger } from "./utils/logger";
+import { join } from "node:path";
 
 const main = async () => {
   const args = process.argv.slice(2);
@@ -28,12 +36,18 @@ const main = async () => {
   const priceRepo = new PriceHistoryRepository();
   const benchmarkRepo = new ComponentBenchmarkRepository();
   const workloadRepo = new WorkloadRepository();
+  const knowledgeRepo = new KnowledgeRepository();
+  const softwareRepo = new SoftwareRequirementsRepository();
 
   // Initialize Services
   const icecat = new IcecatService();
-  const serpapi = new SerpApiService();
   const notebookcheck = new NotebookcheckExtractor();
   const ollama = new OllamaService();
+  let serpapi: SerpApiService | null = null;
+  const getSerpApi = () => {
+    serpapi ??= new SerpApiService();
+    return serpapi;
+  };
 
   try {
     switch (command) {
@@ -50,7 +64,7 @@ const main = async () => {
       }
 
       case "sync-prices": {
-        const providers = [serpapi];
+        const providers = [getSerpApi()];
         const priceSyncJob = new PriceSyncJob(
           providers,
           skuRepo,
@@ -93,6 +107,18 @@ const main = async () => {
         break;
       }
 
+      case "sync-workloads": {
+        const job = new WorkloadSyncJob(workloadRepo);
+        await job.run();
+        break;
+      }
+
+      case "sync-software": {
+        const job = new SoftwareSyncJob(softwareRepo);
+        await job.run();
+        break;
+      }
+
       case "init-aliases": {
         logger.info("Initializing alias schema...");
         const { AliasRepository } = await import("./repositories/AliasRepository");
@@ -103,7 +129,7 @@ const main = async () => {
 
       case "daily-cron": {
         logger.info("Starting daily cron job (Sync Prices -> Refresh View)...");
-        const providers = [serpapi];
+        const providers = [getSerpApi()];
         const priceSyncJob = new PriceSyncJob(
           providers,
           skuRepo,
@@ -153,6 +179,63 @@ const main = async () => {
         break;
       }
 
+      case "ingest-knowledge": {
+        // Usage: ingest-knowledge [dir]
+        // Default: <repoRoot>/knowledge
+        const dir = args[1] || join(import.meta.dir, "../../knowledge");
+        const job = new KnowledgeIngestJob(knowledgeRepo, ollama);
+        await job.ingestMarkdownDirectory({ dir });
+        break;
+      }
+
+      case "ingest-db": {
+        // Usage: ingest-db [target]
+        // Targets:
+        //   workloads (default) - workload_requirements rows
+        //   software            - software_requirements rows
+        const target = (args[1] || "workloads").toLowerCase();
+        const job = new DbKnowledgeIngestJob(knowledgeRepo, ollama);
+
+        switch (target) {
+          case "workloads":
+            await job.ingestWorkloadRequirements();
+            break;
+          case "software":
+            await job.ingestSoftwareRequirements();
+            break;
+          default:
+            throw new Error(`Unknown ingest-db target: ${target}`);
+        }
+
+        break;
+      }
+
+      case "export-db-docs": {
+        // Usage: export-db-docs [target] [outDir]
+        // Targets:
+        //   workloads (default) - workload_requirements -> markdown
+        //   software            - software_requirements -> markdown
+        const target = (args[1] || "workloads").toLowerCase();
+        const outDir =
+          args[2] ||
+          join(import.meta.dir, "../../knowledge/db", target);
+
+        const job = new DbDocsExportJob();
+
+        switch (target) {
+          case "workloads":
+            await job.exportWorkloadRequirements(outDir);
+            break;
+          case "software":
+            await job.exportSoftwareRequirements(outDir);
+            break;
+          default:
+            throw new Error(`Unknown export-db-docs target: ${target}`);
+        }
+
+        break;
+      }
+
       default:
         console.log(`
 CostOpt Aggregator CLI
@@ -165,9 +248,14 @@ Available commands:
   repair-data             - Fix reseller branding and identify integrated GPUs.
   update-value            - Map laptops to workloads based on specs and benchmarks.
   refresh-view            - Update the materialized view for the app.
+  sync-workloads          - Sync workload definitions to DB.
+  sync-software           - Sync software profiles to DB.
   init-aliases            - Initialize the aliases DB tables.
   daily-cron              - Run daily maintenance (prices + view refresh).
   weekly-cron             - Run weekly maintenance (discovery + benchmarks + value).
+  ingest-knowledge [dir]  - Ingest markdown files for RAG (default: ./knowledge).
+  ingest-db [target]      - Ingest DB facts for RAG (targets: workloads, software).
+  export-db-docs [t] [d]  - Export DB facts to markdown docs (t: workloads, software).
         `);
         process.exit(1);
     }
