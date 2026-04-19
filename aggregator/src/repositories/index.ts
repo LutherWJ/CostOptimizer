@@ -6,3 +6,5 @@ export * from "./PriceHistoryRepository";
 export * from "./RawScrapeRepository";
 export * from "./ComponentBenchmarkRepository";
 export * from "./AliasRepository";
+export * from "./KnowledgeRepository";
+export * from "./SoftwareRequirementsRepository";

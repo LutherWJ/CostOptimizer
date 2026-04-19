@@ -1,3 +1,8 @@
+-- Core extensions (UUIDs, fuzzy matching, vectors)
+CREATE EXTENSION IF NOT EXISTS pgcrypto;
+CREATE EXTENSION IF NOT EXISTS pg_trgm;
+CREATE EXTENSION IF NOT EXISTS vector;
+
 -- Product Lines 
 CREATE TABLE product_lines (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -27,6 +32,22 @@ CREATE TABLE workload_requirements (
     min_specs JSONB NOT NULL, -- e.g., '{"ram_gb": 16, "gpu_type": "discrete"}'
     description TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Software requirements (proxy-compatible via workloads)
+-- This table defines "software compatibility" as: the laptop is suitable for all required workloads.
+-- This keeps compatibility logic consistent and avoids hardcoding vendor requirements in SQL.
+CREATE TABLE software_requirements (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    software_key VARCHAR(80) UNIQUE NOT NULL, -- stable key used by the app (e.g. 'solidworks')
+    software_name VARCHAR(120) NOT NULL,      -- display name (e.g. 'SolidWorks')
+    description TEXT,
+    required_workloads JSONB NOT NULL DEFAULT '[]'::jsonb, -- JSON array of workload_name strings
+    os_requirement VARCHAR(10) NOT NULL DEFAULT 'any',     -- 'any' | 'win' | 'mac'
+    source_url TEXT,
+    last_verified DATE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
 -- Maps laptop models to workloads they've been deemed suitable for
@@ -63,8 +84,31 @@ CREATE TABLE raw_scrapes (
 
 
 
--- Enable fuzzy matching extension
-CREATE EXTENSION IF NOT EXISTS pg_trgm;
+-- Knowledge base documents (RAG)
+CREATE TABLE knowledge_documents (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    source_type TEXT NOT NULL, -- 'md' | 'web' | 'db' (etc.)
+    source_uri TEXT NOT NULL,  -- file path, URL, or identifier
+    title TEXT,
+    content_hash TEXT NOT NULL,
+    content TEXT NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE (source_type, source_uri)
+);
+
+CREATE TABLE knowledge_chunks (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    document_id UUID NOT NULL REFERENCES knowledge_documents(id) ON DELETE CASCADE,
+    chunk_index INTEGER NOT NULL,
+    content TEXT NOT NULL,
+    embedding vector(768) NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE (document_id, chunk_index)
+);
+
+CREATE INDEX idx_knowledge_chunks_document ON knowledge_chunks (document_id);
+CREATE INDEX idx_knowledge_chunks_tsv ON knowledge_chunks USING GIN (to_tsvector('english', content));
 
 -- Component Benchmarks (Lookup table for CPUs and GPUs)
 CREATE TABLE component_benchmarks (
@@ -85,6 +129,7 @@ CREATE TABLE component_aliases (
 -- 7. Materialized View for Application Layer
 -- This view flattens the complex relationships into a single table for fast frontend reads.
 -- It identifies the absolute "Best Deal" (lowest price) for New vs Refurbished for every active SKU.
+DROP MATERIALIZED VIEW IF EXISTS laptop_recommendations;
 CREATE MATERIALIZED VIEW laptop_recommendations AS
 WITH latest_prices AS (
     -- Get the most recent price from every vendor for every SKU, separating New vs Refurbished
@@ -128,6 +173,8 @@ SELECT
     ls.hardware_specs,
     ls.qualitative_data,
     COALESCE(sa.workloads, '[]'::jsonb) as suitable_workloads,
+    COALESCE(sw.compatible_software_keys, '[]'::jsonb) as compatible_software_keys,
+    COALESCE(sw.compatible_software_names, '[]'::jsonb) as compatible_software_names,
     bd.price_usd as current_price,
     bd.vendor as best_vendor,
     bd.purchase_url,
@@ -147,6 +194,19 @@ SELECT
 FROM laptop_skus ls
          JOIN product_lines pl ON ls.product_line_id = pl.id
          LEFT JOIN suitability_agg sa ON ls.id = sa.sku_id
+         LEFT JOIN LATERAL (
+           SELECT
+             jsonb_agg(sr.software_key ORDER BY sr.software_key) as compatible_software_keys,
+             jsonb_agg(sr.software_name ORDER BY sr.software_key) as compatible_software_names
+           FROM software_requirements sr
+           WHERE jsonb_array_length(sr.required_workloads) > 0
+             AND COALESCE(sa.workloads, '[]'::jsonb) @> sr.required_workloads
+             AND (
+               sr.os_requirement = 'any' OR
+               (sr.os_requirement = 'win' AND pl.manufacturer <> 'Apple') OR
+               (sr.os_requirement = 'mac' AND pl.manufacturer = 'Apple')
+             )
+         ) sw ON TRUE
          JOIN best_deals bd ON ls.id = bd.laptop_sku_id
 -- Join for CPU Benchmarks
          LEFT JOIN component_aliases ca_cpu ON ca_cpu.alias_name = ls.hardware_specs->>'cpu_family'
@@ -157,6 +217,7 @@ FROM laptop_skus ls
 WHERE ls.is_active = TRUE;
 
 CREATE INDEX idx_rec_workloads ON laptop_recommendations USING GIN (suitable_workloads);
+CREATE INDEX idx_rec_software_keys ON laptop_recommendations USING GIN (compatible_software_keys);
 CREATE INDEX idx_rec_price ON laptop_recommendations (current_price);
 CREATE INDEX idx_rec_manufacturer ON laptop_recommendations (manufacturer);
 CREATE INDEX idx_benchmark_type ON component_benchmarks(component_type);

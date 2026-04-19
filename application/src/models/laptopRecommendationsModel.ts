@@ -58,6 +58,8 @@ export interface LaptopRecommendation {
     battery_hours: number;
   };
   suitable_workloads: string[];
+  compatible_software_keys?: string[];
+  compatible_software_names?: string[];
   current_price: number;
   best_vendor: string;
   purchase_url: string;
@@ -69,6 +71,7 @@ export interface LaptopRecommendation {
 
 export async function getRecommendations(params: {
   workloads?: string;   // comma-separated short IDs, e.g. "daily,webdev,gaming"
+  software?: string;    // comma-separated software keys, e.g. "solidworks,examsoft"
   budget?: string;      // e.g. "0-600", "600-1000", "1000-1500", "1500-2500", "2500-99999", "any"
   size?: string;        // "compact" | "standard" | "desktop" | "any"
 }): Promise<LaptopRecommendation[]> {
@@ -79,6 +82,11 @@ export async function getRecommendations(params: {
   const workloadNames = workloadIds
     .map(id => WORKLOAD_NAME_MAP[id])
     .filter(Boolean);
+
+  // Software filter: keys are stored in compatible_software_keys on the view
+  const softwareKeys = params.software
+    ? params.software.split(",").map(s => s.trim()).filter(Boolean)
+    : [];
 
   // Build budget bounds
   let minPrice: number | null = null;
@@ -135,6 +143,16 @@ export async function getRecommendations(params: {
       whereClauses.push(`suitable_workloads ?& ${arrLiteral}`);
     }
 
+    if (softwareKeys.length > 0) {
+      const arrLiteral =
+        "ARRAY[" +
+        softwareKeys
+          .map(k => "'" + k.replace(/'/g, "''") + "'")
+          .join(",") +
+        "]";
+      whereClauses.push(`compatible_software_keys ?& ${arrLiteral}`);
+    }
+
     const whereStr =
       whereClauses.length > 0 ? "WHERE " + whereClauses.join(" AND ") : "";
 
@@ -156,6 +174,12 @@ export async function getRecommendations(params: {
       suitable_workloads: typeof row.suitable_workloads === "string"
         ? JSON.parse(row.suitable_workloads)
         : row.suitable_workloads,
+      compatible_software_keys: typeof (row as any).compatible_software_keys === "string"
+        ? JSON.parse((row as any).compatible_software_keys)
+        : (row as any).compatible_software_keys,
+      compatible_software_names: typeof (row as any).compatible_software_names === "string"
+        ? JSON.parse((row as any).compatible_software_names)
+        : (row as any).compatible_software_names,
     }));
   } catch (error) {
     console.error("❌ Database Error:", (error as Error).message);
