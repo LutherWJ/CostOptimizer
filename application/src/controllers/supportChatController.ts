@@ -158,6 +158,7 @@ function cleanAssistantAnswer(raw: string): string {
     .replace(/\bour\s+notes\b/gi, "our compatibility info")
     .replace(/\bin\s+our\s+notes\b/gi, "in our compatibility info")
     .replace(/\bnotes\b/gi, "compatibility info")
+    .replace(/\binternal context\b/gi, "compatibility info")
     .replace(/^according to\s+source\s*\d+\s*[:,]?\s*/i, "")
     .replace(/^(according to|based on)\s+the\s+(provided\s+)?sources[:,]?\s*/i, "")
     .replace(/^sources?[:,]?\s*/i, "")
@@ -592,6 +593,15 @@ function isCompatibilityQuestion(message: string): boolean {
   );
 }
 
+function isCanRunQuestion(message: string): boolean {
+  const m = (message || "").toLowerCase();
+  return (
+    /\b(can i|can you|can it|will it)\s+(run|handle|support)\b/.test(m) ||
+    /\b(can run|run)\s+[a-z0-9]/.test(m) ||
+    /\b(laptop|computer)\b.*\b(for|to)\b.*\b(run|handle)\b/.test(m)
+  );
+}
+
 function isBroadRecommendationQuestion(message: string): boolean {
   const m = (message || "").toLowerCase();
   return (
@@ -711,13 +721,25 @@ function formatMinSpecsForUser(specs: Record<string, any>): string {
     lines.push(`- ${label}: ${value}`);
   };
 
-  add("RAM", specs.ram_gb != null ? `${specs.ram_gb} GB` : null);
-  add("Storage", specs.storage_gb != null ? `${specs.storage_gb} GB` : null);
-  add("CPU", specs.min_cpu_score != null ? `score ${specs.min_cpu_score}+` : null);
-  add("CPU cores", specs.cpu_cores != null ? `${specs.cpu_cores}+` : null);
+  const num = (v: any): number | null => {
+    const n = typeof v === "number" ? v : Number(v);
+    return Number.isFinite(n) ? n : null;
+  };
+
+  const ram = num(specs.ram_gb);
+  const storage = num(specs.storage_gb);
+  const minCpu = num(specs.min_cpu_score);
+  const cores = num(specs.cpu_cores);
+  const minGpu = num(specs.min_gpu_score);
+  const vram = num(specs.vram_gb);
+
+  if (ram != null && ram > 0) add("RAM", `${ram} GB`);
+  if (storage != null && storage > 0) add("Storage", `${storage} GB`);
+  if (minCpu != null && minCpu > 0) add("CPU", `score ${minCpu}+`);
+  if (cores != null && cores > 0) add("CPU cores", `${cores}+`);
   add("GPU", specs.gpu_type || null);
-  add("GPU score", specs.min_gpu_score != null ? `${specs.min_gpu_score}+` : null);
-  add("VRAM", specs.vram_gb != null ? `${specs.vram_gb} GB+` : null);
+  if (minGpu != null && minGpu > 0) add("GPU score", `${minGpu}+`);
+  if (vram != null && vram > 0) add("VRAM", `${vram} GB+`);
   add("OS", specs.os_requirement || null);
 
   return lines.join("\n");
@@ -1186,6 +1208,11 @@ export async function supportChatController(c: Context) {
     const detectedWorkloadNames = detectWorkloadNamesFromText(detectText, workloadProfiles);
     const detectedOs = detectOsFromText(detectText);
 
+    // Message-only detection: used for "just typed the software name" follow-ups.
+    // Important: do NOT use history here, otherwise short follow-ups like "requirements"
+    // get misclassified as "just software mention" if a software was mentioned earlier.
+    const detectedSoftwareKeysInMessage = detectSoftwareKeysFromText(message, softwareProfiles);
+
     // For broad shopping/budget questions, avoid Ollama and ask clarifiers first (unless we can answer about a specific software/workload).
     if (
       isBroadRecommendationQuestion(message) &&
@@ -1220,8 +1247,8 @@ export async function supportChatController(c: Context) {
     }
 
     // If they just typed a software name as a follow-up, don't invoke the LLM: ask one targeted question or continue the prior intent.
-    if (isJustSoftwareMention(message, detectedSoftwareKeys)) {
-      const key = detectedSoftwareKeys[0]!;
+    if (isJustSoftwareMention(message, detectedSoftwareKeysInMessage)) {
+      const key = detectedSoftwareKeysInMessage[0]!;
       const profile = softwareProfiles.find((p) => p.software_key === key);
       const name = profile?.software_name || key;
 
@@ -1263,7 +1290,12 @@ export async function supportChatController(c: Context) {
     };
 
     // Software compatibility questions (Windows vs macOS): answer from software profiles without Ollama.
-    if (isCompatibilityQuestion(message) && plan.softwareKeys.length === 1) {
+    if (
+      plan.softwareKeys.length === 1 &&
+      isCompatibilityQuestion(message) &&
+      !wantsRequirementsAnswer(message) &&
+      !isBroadRecommendationQuestion(message)
+    ) {
       const key = plan.softwareKeys[0]!;
       const profile = softwareProfiles.find((p) => p.software_key === key);
       const name = profile?.software_name || key;
@@ -1284,8 +1316,11 @@ export async function supportChatController(c: Context) {
       );
     }
 
-    // Fast path: if user asks for minimum requirements and we can answer directly from DB profiles, do it without the LLM.
-    if (wantsRequirementsAnswer(message) && !wantsUpgradeAdvice(message)) {
+    // Fast path: if user asks for minimum requirements (or "can it run X") and we can answer directly from DB profiles, do it without the LLM.
+    if (
+      (wantsRequirementsAnswer(message) || (plan.softwareKeys.length > 0 && isCanRunQuestion(message))) &&
+      !wantsUpgradeAdvice(message)
+    ) {
       const selectedWorkloads: WorkloadRequirement[] = [];
 
       for (const key of plan.softwareKeys) {
