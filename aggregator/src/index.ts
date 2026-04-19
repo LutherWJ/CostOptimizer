@@ -1,5 +1,4 @@
 import { IcecatService } from "./extractors/icecat";
-import { SerpApiService } from "./extractors/serpapi";
 import {
   LaptopSkuRepository,
   ProductLineRepository,
@@ -23,6 +22,8 @@ import { DbKnowledgeIngestJob } from "./jobs/DbKnowledgeIngestJob";
 import { WorkloadSyncJob } from "./jobs/WorkloadSyncJob";
 import { DbDocsExportJob } from "./jobs/DbDocsExportJob";
 import { SoftwareSyncJob } from "./jobs/SoftwareSyncJob";
+import { AuditJob } from "./jobs/AuditJob";
+import { AuditRepository } from "./repositories/AuditRepository";
 import { logger } from "./utils/logger";
 import { join } from "node:path";
 
@@ -38,16 +39,12 @@ const main = async () => {
   const workloadRepo = new WorkloadRepository();
   const knowledgeRepo = new KnowledgeRepository();
   const softwareRepo = new SoftwareRequirementsRepository();
+  const auditRepo = new AuditRepository();
 
   // Initialize Services
   const icecat = new IcecatService();
   const notebookcheck = new NotebookcheckExtractor();
   const ollama = new OllamaService();
-  let serpapi: SerpApiService | null = null;
-  const getSerpApi = () => {
-    serpapi ??= new SerpApiService();
-    return serpapi;
-  };
 
   try {
     switch (command) {
@@ -64,9 +61,7 @@ const main = async () => {
       }
 
       case "sync-prices": {
-        const providers = [getSerpApi()];
         const priceSyncJob = new PriceSyncJob(
-          providers,
           skuRepo,
           lineRepo,
           priceRepo,
@@ -119,6 +114,12 @@ const main = async () => {
         break;
       }
 
+      case "audit": {
+        const auditJob = new AuditJob(auditRepo);
+        await auditJob.run();
+        break;
+      }
+
       case "init-aliases": {
         logger.info("Initializing alias schema...");
         const { AliasRepository } = await import("./repositories/AliasRepository");
@@ -129,9 +130,7 @@ const main = async () => {
 
       case "daily-cron": {
         logger.info("Starting daily cron job (Sync Prices -> Refresh View)...");
-        const providers = [getSerpApi()];
         const priceSyncJob = new PriceSyncJob(
-          providers,
           skuRepo,
           lineRepo,
           priceRepo,
@@ -147,12 +146,12 @@ const main = async () => {
       case "weekly-cron": {
         logger.info("Starting weekly maintenance...");
         
-        // 1. Discover
-        logger.info("Step 1: Discovering new laptops...");
+        // 1. Discover (Limit to 50 new items to prevent hanging)
+        logger.info("Step 1: Discovering new laptops (Limit: 50)...");
         const sinceYear = 2024;
         const sinceDate = new Date(`${sinceYear}-01-01`);
         const discoveryJob = new LaptopDiscoveryJob(icecat, skuRepo, lineRepo);
-        await discoveryJob.run(sinceDate);
+        await discoveryJob.run(sinceDate, 50);
 
         // 2. Repair Data (Fix branding/Integrated GPUs)
         logger.info("Step 2: Repairing metadata...");
@@ -170,10 +169,19 @@ const main = async () => {
         const aliasSyncJob = new AliasSyncJob(skuRepo, benchmarkRepo, ollama);
         await aliasSyncJob.run();
 
-        // 5. Suitability
-        logger.info("Step 5: Updating suitability and value scores...");
+        // 5. Sync Prices (Mock)
+        logger.info("Step 5: Generating mock market prices...");
+        const priceSyncJob = new PriceSyncJob(skuRepo, lineRepo, priceRepo);
+        await priceSyncJob.run();
+
+        // 6. Suitability
+        logger.info("Step 6: Updating suitability mappings...");
         const suitabilityJob = new SuitabilityJob(skuRepo, workloadRepo);
         await suitabilityJob.run();
+
+        // 7. Refresh View
+        logger.info("Step 7: Refreshing materialized view for application...");
+        await db`REFRESH MATERIALIZED VIEW laptop_recommendations;`.execute();
 
         logger.info("Weekly maintenance completed successfully.");
         break;
@@ -250,9 +258,10 @@ Available commands:
   refresh-view            - Update the materialized view for the app.
   sync-workloads          - Sync workload definitions to DB.
   sync-software           - Sync software profiles to DB.
+  audit                   - Perform a database quality audit.
   init-aliases            - Initialize the aliases DB tables.
   daily-cron              - Run daily maintenance (prices + view refresh).
-  weekly-cron             - Run weekly maintenance (discovery + benchmarks + value).
+  weekly-cron             - Run full maintenance (discovery + benchmarks + prices + suitability + view).
   ingest-knowledge [dir]  - Ingest markdown files for RAG (default: ./knowledge).
   ingest-db [target]      - Ingest DB facts for RAG (targets: workloads, software).
   export-db-docs [t] [d]  - Export DB facts to markdown docs (t: workloads, software).

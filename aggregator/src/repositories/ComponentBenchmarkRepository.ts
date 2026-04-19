@@ -1,4 +1,5 @@
 import { db } from "./connection";
+import { extractId, normalizeRow } from "./utils";
 
 export interface ComponentBenchmark {
   id: string;
@@ -14,11 +15,7 @@ export class ComponentBenchmarkRepository {
    * Helper to normalize database rows (e.g., parsing JSONB strings to objects)
    */
   private normalizeRow(row: any): ComponentBenchmark {
-    if (!row) return row;
-    return {
-      ...row,
-      extra_data: typeof row.extra_data === "string" ? JSON.parse(row.extra_data) : row.extra_data
-    } as ComponentBenchmark;
+    return normalizeRow<ComponentBenchmark>(row, ["extra_data"]);
   }
 
   /**
@@ -41,20 +38,7 @@ export class ComponentBenchmarkRepository {
       RETURNING id;
     `;
 
-    if (result.length === 0) {
-      console.error(`Benchmark upsert failed for ${name}. Result:`, JSON.stringify(result));
-      throw new Error(`Benchmark upsert failed for ${name}: No rows returned`);
-    }
-
-    const row = result[0] as any;
-    const id = row.id || row.ID || row.uuid || row.UUID;
-    
-    if (!id) {
-      console.error(`Benchmark upsert returned a row but no ID column was found. Keys: ${Object.keys(row).join(", ")}`);
-      throw new Error(`Benchmark upsert failed for ${name}: ID column missing in response`);
-    }
-
-    return id as string;
+    return extractId(result, `Benchmark upsert for ${name}`);
   }
 
   /**

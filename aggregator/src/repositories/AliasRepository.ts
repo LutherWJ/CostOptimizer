@@ -1,4 +1,5 @@
 import { db } from "./connection";
+import { extractId } from "./utils";
 
 export interface SkuAlias {
   id: string;
@@ -67,19 +68,6 @@ export class AliasRepository {
       RETURNING id;
     `;
 
-    if (result.length === 0) {
-      console.error(`Alias save failed for ${rawString}. Result:`, JSON.stringify(result));
-      throw new Error(`Alias save failed for ${rawString}: No rows returned`);
-    }
-
-    const row = result[0] as any;
-    const id = row.id || row.ID || row.uuid || row.UUID;
-    
-    if (!id) {
-      console.error(`Alias save returned a row but no ID column was found. Keys: ${Object.keys(row).join(", ")}`);
-      throw new Error(`Alias save failed for ${rawString}: ID column missing in response`);
-    }
-
-    return id as string;
+    return extractId(result, `Alias save for ${rawString}`);
   }
 }

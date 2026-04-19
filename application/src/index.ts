@@ -5,12 +5,14 @@ import { workloadsController } from "./controllers/workloadsController";
 import { filtersController } from "./controllers/filtersController";
 import { getRecommendationsController } from "./controllers/recommendationController";
 import { supportChatController } from "./controllers/supportChatController";
+import { logger } from "hono/logger";
 
 const app = new Hono();
+app.use("*", logger());
 
-const staticRoot = `${import.meta.dir}/..`;
-app.use("/public/*", serveStatic({ root: staticRoot }));
-app.use("/images/*", serveStatic({ root: import.meta.dir }));
+const publicRoot = `${import.meta.dir}/..`;
+app.use("/public/*", serveStatic({ root: publicRoot }));
+app.use("/images/*", serveStatic({ root: `${import.meta.dir}/images` }));
 
 app.get("/", getHome);
 app.get("/workloads", workloadsController);

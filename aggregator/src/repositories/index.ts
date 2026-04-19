@@ -1,4 +1,5 @@
 export * from "./connection";
+export * from "./utils";
 export * from "./ProductLineRepository";
 export * from "./LaptopSkuRepository";
 export * from "./WorkloadRepository";

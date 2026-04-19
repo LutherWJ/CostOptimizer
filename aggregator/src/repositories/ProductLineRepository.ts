@@ -1,4 +1,5 @@
 import { db } from "./connection";
+import { extractId } from "./utils";
 
 export interface ProductLine {
   id: string;
@@ -18,21 +19,7 @@ export class ProductLineRepository {
       RETURNING id;
     `;
     
-    if (result.length === 0) {
-      console.error(`Upsert failed for ${manufacturer} ${line_name}. Result:`, JSON.stringify(result));
-      throw new Error(`Upsert failed for ${manufacturer} ${line_name}: No rows returned. Check if the table has triggers or if the database is in read-only mode.`);
-    }
-    
-    // Case-insensitive ID lookup
-    const row = result[0] as any;
-    const id = row.id || row.ID || row.uuid || row.UUID;
-    
-    if (!id) {
-      console.error(`Upsert returned a row but no ID column was found. Keys: ${Object.keys(row).join(", ")}`);
-      throw new Error(`Upsert failed for ${manufacturer} ${line_name}: ID column missing in response`);
-    }
-    
-    return id as string;
+    return extractId(result, `Product Line upsert for ${manufacturer} ${line_name}`);
   }
 
   async findById(id: string): Promise<ProductLine | null> {

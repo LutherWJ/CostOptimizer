@@ -1,4 +1,5 @@
 import { db } from "./connection";
+import { extractId, normalizeRow } from "./utils";
 import type { HardwareSpecs } from "../models/hardwareSpecsSchema";
 
 export interface LaptopSku {
@@ -44,20 +45,7 @@ export class LaptopSkuRepository {
       RETURNING id;
     `;
 
-    if (result.length === 0) {
-      console.error(`Laptop SKU upsert failed for ${skuNumber}. Result:`, JSON.stringify(result));
-      throw new Error(`Laptop SKU upsert failed for ${skuNumber}: No rows returned`);
-    }
-
-    const row = result[0] as any;
-    const id = row.id || row.ID || row.uuid || row.UUID;
-    
-    if (!id) {
-      console.error(`Laptop SKU upsert returned a row but no ID column was found. Keys: ${Object.keys(row).join(", ")}`);
-      throw new Error(`Laptop SKU upsert failed for ${skuNumber}: ID column missing in response`);
-    }
-
-    return id as string;
+    return extractId(result, `Laptop SKU upsert for ${skuNumber}`);
   }
 
   async findBySkuNumber(skuNumber: string): Promise<LaptopSku | null> {
@@ -65,14 +53,7 @@ export class LaptopSkuRepository {
       SELECT * FROM laptop_skus WHERE LOWER(sku_number) = LOWER(${skuNumber})
     `;
     if (result.length === 0) return null;
-    const row = result[0] as any;
-    if (typeof row.hardware_specs === "string") {
-      row.hardware_specs = JSON.parse(row.hardware_specs);
-    }
-    if (typeof row.qualitative_data === "string" && row.qualitative_data !== null) {
-      row.qualitative_data = JSON.parse(row.qualitative_data);
-    }
-    return row as LaptopSku;
+    return normalizeRow<LaptopSku>(result[0], ["hardware_specs", "qualitative_data"]);
   }
 
   async findFuzzy(normalizedTitle: string): Promise<{ id: string, score: number } | null> {
@@ -111,15 +92,9 @@ export class LaptopSkuRepository {
     const result = await db`
       SELECT * FROM laptop_skus WHERE is_active = TRUE
     `;
-    return (result as any[]).map(row => {
-      if (typeof row.hardware_specs === "string") {
-        row.hardware_specs = JSON.parse(row.hardware_specs);
-      }
-      if (typeof row.qualitative_data === "string" && row.qualitative_data !== null) {
-        row.qualitative_data = JSON.parse(row.qualitative_data);
-      }
-      return row;
-    }) as LaptopSku[];
+    return (result as any[]).map(row => 
+      normalizeRow<LaptopSku>(row, ["hardware_specs", "qualitative_data"])
+    );
   }
 
   /**
@@ -143,14 +118,8 @@ export class LaptopSkuRepository {
       LEFT JOIN component_benchmarks gpu ON gpu.component_name = COALESCE(ca_gpu.canonical_name, ls.hardware_specs->>'gpu_model')
       WHERE ls.is_active = TRUE;
     `;
-    return (result as any[]).map(row => {
-      if (typeof row.hardware_specs === "string") {
-        row.hardware_specs = JSON.parse(row.hardware_specs);
-      }
-      if (typeof row.qualitative_data === "string" && row.qualitative_data !== null) {
-        row.qualitative_data = JSON.parse(row.qualitative_data);
-      }
-      return row;
-    }) as LaptopSkuWithBenchmarks[];
+    return (result as any[]).map(row => 
+      normalizeRow<LaptopSkuWithBenchmarks>(row, ["hardware_specs", "qualitative_data"])
+    );
   }
 }
