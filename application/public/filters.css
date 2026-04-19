@@ -13,6 +13,39 @@
 .preset:hover{border-color:var(--teal);color:var(--teal2);}
 .preset.sel{background:var(--teal-l);border-color:var(--teal);color:var(--ink);}
 
+/* BUDGET NUDGE */
+.nudge-row{
+  margin:-14px 0 28px;
+  border:1.5px solid var(--border);
+  border-radius:14px;
+  padding:14px 16px 12px;
+  background:var(--white);
+}
+.nudge-head{display:flex;align-items:baseline;justify-content:space-between;gap:12px;margin-bottom:8px;flex-wrap:wrap;}
+.nudge-title{font-size:13px;font-weight:800;color:var(--ink);}
+.nudge-sub{font-size:12px;color:var(--muted);opacity:.75;}
+.nudge-ctl{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+.nudge-btn{
+  width:34px;height:34px;border-radius:10px;
+  border:1.5px solid var(--border);
+  background:var(--white);
+  font-size:16px;font-weight:900;color:var(--ink);
+  cursor:pointer;transition:all .15s;
+}
+.nudge-btn:hover{border-color:var(--teal);color:var(--teal2);}
+.nudge-btn:disabled{opacity:.35;cursor:not-allowed;}
+.nudge-dots{display:flex;align-items:center;gap:6px;}
+.ndot{
+  width:10px;height:10px;border-radius:999px;
+  border:1.5px solid var(--border);
+  background:var(--white);
+  cursor:pointer;
+  transition:all .15s;
+}
+.ndot.on{border-color:var(--teal);background:var(--teal);}
+.nudge-pct{font-size:12px;font-weight:900;color:var(--ink);min-width:46px;}
+.nudge-ceiling{margin-top:8px;font-size:12px;font-weight:700;color:var(--ink);opacity:.82;}
+
 /* SOFTWARE CHIPS (MULTI-SELECT) */
 .sw-grid{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:32px;}
 .swopt{

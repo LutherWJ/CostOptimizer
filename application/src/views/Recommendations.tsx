@@ -1,47 +1,6 @@
 import Base from "./Base";
 import type { LaptopRecommendation } from "../models/laptopRecommendationsModel";
 
-// Maps short workload IDs to display labels for the pill bar
-const WORKLOAD_LABELS: Record<string, string> = {
-  daily:      "Daily Browsing",
-  stream:     "Streaming",
-  writing:    "Writing & Study",
-  casual2d:   "Casual 2D Games",
-  office:     "Office Productivity",
-  finance:    "Finance",
-  research:   "Research & Analytics",
-  remote:     "Remote Work & VPN",
-  erp:        "ERP Systems",
-  design:     "Photo & Design",
-  video:      "Video Editing",
-  music:      "Music Production",
-  content:    "Content Creation",
-  render3d:   "VFX & 3D Rendering",
-  webdev:     "Web Development",
-  datasci:    "Data Science",
-  cyber:      "Cybersecurity",
-  ml:         "Machine Learning",
-  gamedev:    "Game Development",
-  cad:        "3D CAD / Modeling",
-  arch:       "Architecture & BIM",
-  science:    "Scientific Simulation",
-  gis:        "GIS & Mapping",
-  electrical: "Electrical / EDA",
-  casual:     "Casual Gaming",
-  esports:    "Esports",
-  gaming:     "AAA Gaming",
-  vr:         "VR Gaming",
-};
-
-// Windows-only workload names (inferred from os_requirement: "win")
-const WIN_ONLY_WORKLOADS = new Set([
-  "Office Productivity", "Finance", "Remote Work & VPN", "ERP Systems",
-  "VFX & 3D Rendering", "Cybersecurity", "Game Development",
-  "3D CAD / Modeling", "Architecture & BIM", "Scientific Simulation",
-  "GIS & Mapping", "Electrical / EDA",
-  "Casual Gaming", "Esports", "AAA Gaming", "VR Gaming",
-]);
-
 function formatStorage(gb: number): string {
   return gb >= 1024 ? `${gb / 1024} TB` : `${gb} GB`;
 }
@@ -69,16 +28,12 @@ function renderCard(laptop: LaptopRecommendation, idx: number): string {
     ? `<span class="rc-cond-badge rc-cond-ref">REFURB</span>`
     : `<span class="rc-cond-badge rc-cond-new">NEW</span>`;
 
-  // Workloads this card supports (for pill filtering, comma-separated DB names)
-  const workloadsAttr = (laptop.suitable_workloads || []).join(",").replace(/"/g, "&quot;");
-
   return `
     <div class="rec-card${isBest ? " best" : ""}"
       data-idx="${idx}"
       data-price="${laptop.current_price}"
       data-battery="${specs.battery_hours}"
-      data-value="${laptop.value_score ?? 0}"
-      data-workloads="${workloadsAttr}">
+      data-value="${laptop.value_score ?? 0}">
 
       <div class="rc-top">
         <div class="rc-title-block">
@@ -126,9 +81,10 @@ const Recommendations = (params: {
   workloadIds: string[];
   budget: string;
   size: string;
+  budgetNudgeSteps?: number;
   filtersUrl: string;
 }) => {
-  const { laptops, workloadIds, budget, size, filtersUrl } = params;
+  const { laptops, workloadIds, budget, size, budgetNudgeSteps = 0, filtersUrl } = params;
 
   // Build sub-header text
   const budgetLabel =
@@ -139,25 +95,25 @@ const Recommendations = (params: {
     budget === "1500-2500"      ? "$1.5k–$2.5k" :
     budget === "2500-99999"     ? "$2.5k+" : "any budget";
 
+  const budgetTagLabel =
+    budget === "any" || !budget ? "No limit" :
+    budget === "0-600"          ? "Under $600" :
+    budget === "600-1000"       ? "$600â€“$1k" :
+    budget === "1000-1500"      ? "$1kâ€“$1.5k" :
+    budget === "1500-2500"      ? "$1.5kâ€“$2.5k" :
+    budget === "2500-99999"     ? "$2.5k+" : "Budget";
+
   const sizeLabel =
     size === "compact"  ? "compact screen" :
     size === "standard" ? "standard screen" :
     size === "desktop"  ? "desktop screen" : "any screen size";
 
+  const screenTagLabel =
+    size === "compact"  ? "Compact" :
+    size === "standard" ? "Standard" :
+    size === "desktop"  ? "Desktop" : "Any Size";
+
   const subText = `Budget: ${budgetLabel} · ${sizeLabel}`;
-
-  // Workload pills
-  const pillsHtml = workloadIds.length > 0
-    ? workloadIds.map(id => {
-        const label = WORKLOAD_LABELS[id] || id;
-        return `<div class="rpill" data-workload="${label}" onclick="pickPill(this)"><div class="rdot"></div>${label}</div>`;
-      }).join("")
-    : "";
-
-  // OS warning: show if any selected workload is Windows-only
-  const selectedFullNames = workloadIds.map(id => WORKLOAD_LABELS[id]).filter(Boolean);
-  const hasWinOnlyWorkload = selectedFullNames.some(n => WIN_ONLY_WORKLOADS.has(n));
-  const osWarnClass = hasWinOnlyWorkload ? " show" : "";
 
   // Cards
   const cardsHtml = laptops.length > 0
@@ -176,7 +132,15 @@ const Recommendations = (params: {
         <span class="nav-dot"></span>LapTop
       </a>
       <div class="nav-right">
-        <a class="nav-restart" href="${filtersUrl}">&#8592; Edit preferences</a>
+        <div class="nav-pager" aria-label="Page navigation">
+          <button class="nav-arrow" type="button" data-dir="prev" data-href="${filtersUrl}" aria-label="Back">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>
+          </button>
+          <div class="nav-page-label">Results</div>
+          <button class="nav-arrow" type="button" data-dir="next" disabled aria-disabled="true" aria-label="Next">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>
+          </button>
+        </div>
       </div>
     </nav>
 
@@ -184,27 +148,168 @@ const Recommendations = (params: {
 
       <div class="results-header-row">
         <div class="res-title">Your recommendations</div>
-        <div class="res-count">${laptops.length} laptop${laptops.length !== 1 ? "s" : ""} matched</div>
+        <div class="res-count" id="resCount">${laptops.length} laptop${laptops.length !== 1 ? "s" : ""} matched</div>
       </div>
-      <div class="res-sub">${subText}</div>
+      <div class="res-sub" id="resSub">${subText}</div>
 
-      <div class="os-warn-banner${osWarnClass}">
-        <span class="os-warn-icon">&#x1F6AB;</span>
-        <div>
-          <div class="os-warn-title">macOS excluded from your results</div>
-          <div class="os-warn-text">Your selected workloads require Windows-only software. MacBooks have been removed from your results. This is one of the most common reasons students end up with an incompatible laptop.</div>
+      <div class="refine-shell" id="refineShell"
+        data-init-workloads="${workloadIds.join(",")}"
+        data-init-budget="${budget}"
+        data-init-size="${size}"
+        data-init-bn="${budgetNudgeSteps}">
+
+        <div class="refine-bar" id="prefBar">
+          <button class="pref-tag" id="prefTagWorkloads" type="button" onclick="togglePrefDrawer('workloads')">
+            <span class="pref-k">Workloads</span>
+            <span class="pref-v" id="prefWorkloadsVal">${workloadIds.length}</span>
+          </button>
+          <button class="pref-tag" id="prefTagBudget" type="button" onclick="togglePrefDrawer('budget')">
+            <span class="pref-k">Budget</span>
+            <span class="pref-v" id="prefBudgetVal">${budgetTagLabel}${budgetNudgeSteps > 0 ? ` +${budgetNudgeSteps * 10}%` : ""}</span>
+          </button>
+          <button class="pref-tag" id="prefTagScreen" type="button" onclick="togglePrefDrawer('screen')">
+            <span class="pref-k">Screen</span>
+            <span class="pref-v" id="prefScreenVal">${screenTagLabel}</span>
+          </button>
+        </div>
+
+        <div class="refine-drawer" id="prefDrawer" aria-hidden="true">
+          <div class="refine-drawer-inner">
+            <div class="pref-drawer-top">
+              <div class="pref-tabs" role="tablist" aria-label="Refine results">
+                <button class="ptab" type="button" data-tab="workloads" onclick="openPrefDrawer('workloads')" role="tab">Workloads</button>
+                <button class="ptab" type="button" data-tab="budget" onclick="openPrefDrawer('budget')" role="tab">Budget</button>
+                <button class="ptab" type="button" data-tab="screen" onclick="openPrefDrawer('screen')" role="tab">Screen</button>
+              </div>
+              <button class="pref-apply" id="prefApply" type="button" onclick="applyPrefDrawer()">Apply &#10003;</button>
+            </div>
+
+            <div class="pref-panels">
+              <div class="ppanel" data-tab="workloads" role="tabpanel">
+                <div class="wl-mini-wrap" id="wlMiniWrap">
+                  <div class="wl-mini-group">
+                    <div class="wl-mini-head">Everyday</div>
+                    <div class="wl-mini-grid">
+                      <button class="wl-mini" type="button" data-id="daily">daily<div class="wl-mini-lbl">Daily</div></button>
+                      <button class="wl-mini" type="button" data-id="stream">stream<div class="wl-mini-lbl">Streaming</div></button>
+                      <button class="wl-mini" type="button" data-id="writing">writing<div class="wl-mini-lbl">Writing</div></button>
+                      <button class="wl-mini" type="button" data-id="casual2d">casual2d<div class="wl-mini-lbl">Casual 2D</div></button>
+                    </div>
+                  </div>
+
+                  <div class="wl-mini-group">
+                    <div class="wl-mini-head">Office</div>
+                    <div class="wl-mini-grid">
+                      <button class="wl-mini" type="button" data-id="office">office<div class="wl-mini-lbl">Office</div></button>
+                      <button class="wl-mini" type="button" data-id="finance">finance<div class="wl-mini-lbl">Finance</div></button>
+                      <button class="wl-mini" type="button" data-id="research">research<div class="wl-mini-lbl">Research</div></button>
+                      <button class="wl-mini" type="button" data-id="remote">remote<div class="wl-mini-lbl">Remote</div></button>
+                      <button class="wl-mini" type="button" data-id="erp">erp<div class="wl-mini-lbl">ERP</div></button>
+                    </div>
+                  </div>
+
+                  <div class="wl-mini-group">
+                    <div class="wl-mini-head">Creative</div>
+                    <div class="wl-mini-grid">
+                      <button class="wl-mini" type="button" data-id="design">design<div class="wl-mini-lbl">Design</div></button>
+                      <button class="wl-mini" type="button" data-id="video">video<div class="wl-mini-lbl">Video</div></button>
+                      <button class="wl-mini" type="button" data-id="music">music<div class="wl-mini-lbl">Music</div></button>
+                      <button class="wl-mini" type="button" data-id="content">content<div class="wl-mini-lbl">Content</div></button>
+                      <button class="wl-mini" type="button" data-id="render3d">render3d<div class="wl-mini-lbl">3D/VFX</div></button>
+                    </div>
+                  </div>
+
+                  <div class="wl-mini-group">
+                    <div class="wl-mini-head">Tech</div>
+                    <div class="wl-mini-grid">
+                      <button class="wl-mini" type="button" data-id="webdev">webdev<div class="wl-mini-lbl">Web Dev</div></button>
+                      <button class="wl-mini" type="button" data-id="datasci">datasci<div class="wl-mini-lbl">Data</div></button>
+                      <button class="wl-mini" type="button" data-id="cyber">cyber<div class="wl-mini-lbl">Cyber</div></button>
+                      <button class="wl-mini" type="button" data-id="ml">ml<div class="wl-mini-lbl">ML</div></button>
+                      <button class="wl-mini" type="button" data-id="gamedev">gamedev<div class="wl-mini-lbl">Game Dev</div></button>
+                    </div>
+                  </div>
+
+                  <div class="wl-mini-group">
+                    <div class="wl-mini-head">Engineering</div>
+                    <div class="wl-mini-grid">
+                      <button class="wl-mini" type="button" data-id="cad">cad<div class="wl-mini-lbl">CAD</div></button>
+                      <button class="wl-mini" type="button" data-id="arch">arch<div class="wl-mini-lbl">Architecture</div></button>
+                      <button class="wl-mini" type="button" data-id="science">science<div class="wl-mini-lbl">Science</div></button>
+                      <button class="wl-mini" type="button" data-id="gis">gis<div class="wl-mini-lbl">GIS</div></button>
+                      <button class="wl-mini" type="button" data-id="electrical">electrical<div class="wl-mini-lbl">Electrical</div></button>
+                    </div>
+                  </div>
+
+                  <div class="wl-mini-group">
+                    <div class="wl-mini-head">Gaming</div>
+                    <div class="wl-mini-grid">
+                      <button class="wl-mini" type="button" data-id="casual">casual<div class="wl-mini-lbl">Casual</div></button>
+                      <button class="wl-mini" type="button" data-id="esports">esports<div class="wl-mini-lbl">Esports</div></button>
+                      <button class="wl-mini" type="button" data-id="gaming">gaming<div class="wl-mini-lbl">AAA</div></button>
+                      <button class="wl-mini" type="button" data-id="vr">vr<div class="wl-mini-lbl">VR</div></button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="ppanel" data-tab="budget" role="tabpanel">
+                <div class="section-heading" style="margin-bottom:10px;">Budget range</div>
+                <div class="preset-row" id="budgetPresets">
+                  <div class="preset" data-value="any">No limit</div>
+                  <div class="preset" data-value="0-600">Under $600</div>
+                  <div class="preset" data-value="600-1000">$600&ndash;$1k</div>
+                  <div class="preset" data-value="1000-1500">$1k&ndash;$1.5k</div>
+                  <div class="preset" data-value="1500-2500">$1.5k&ndash;$2.5k</div>
+                  <div class="preset" data-value="2500-99999">$2.5k+</div>
+                </div>
+
+                <div class="nudge-row" id="budgetNudgeRow">
+                  <div class="nudge-head">
+                    <div class="nudge-title">Budget nudge</div>
+                    <div class="nudge-sub">Widen your ceiling in +10% steps.</div>
+                  </div>
+                  <div class="nudge-ctl" aria-label="Budget nudge control">
+                    <button class="nudge-btn" type="button" id="nudgeMinus" aria-label="Decrease nudge">&minus;</button>
+                    <div class="nudge-dots" id="nudgeDots" aria-label="Nudge steps"></div>
+                    <button class="nudge-btn" type="button" id="nudgePlus" aria-label="Increase nudge">+</button>
+                    <div class="nudge-pct" id="nudgePct">+0%</div>
+                  </div>
+                  <div class="nudge-ceiling" id="nudgeCeiling"></div>
+                </div>
+              </div>
+
+              <div class="ppanel" data-tab="screen" role="tabpanel">
+                <div class="section-heading" style="margin-bottom:10px;">Screen size</div>
+                <div class="size-grid" id="sizeCards">
+                  <div class="size-card" data-value="any">
+                    <span class="s-ico">&#x1F4D0;</span>
+                    <div class="s-title">Any Size</div>
+                    <div class="s-sub">All sizes</div>
+                  </div>
+                  <div class="size-card" data-value="compact">
+                    <span class="s-ico">&#x1F4BC;</span>
+                    <div class="s-title">Compact</div>
+                    <div class="s-sub">&le;14&Prime; &mdash; ultraportable</div>
+                  </div>
+                  <div class="size-card" data-value="standard">
+                    <span class="s-ico">&#x2696;&#xFE0F;</span>
+                    <div class="s-title">Standard</div>
+                    <div class="s-sub">15&ndash;16&Prime; &mdash; best balance</div>
+                  </div>
+                  <div class="size-card" data-value="desktop">
+                    <span class="s-ico">&#x1F5A5;&#xFE0F;</span>
+                    <div class="s-title">Desktop</div>
+                    <div class="s-sub">17&Prime;+ &mdash; stays at desk</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+          </div>
         </div>
       </div>
 
-      ${workloadIds.length > 0 ? `
-      <div class="workload-bar">
-        <span class="wl-filter-label">Workloads</span>
-        <div class="wl-filter-div"></div>
-        <div class="rpill-group" id="wlPills">
-          <div class="rpill on" data-workload="" onclick="pickPill(this)"><div class="rdot"></div>All workloads</div>
-          ${pillsHtml}
-        </div>
-      </div>` : ""}
 
       <div class="p4-sort-row">
         <span class="sort-lbl">Sort by</span>
@@ -219,13 +324,9 @@ const Recommendations = (params: {
         ${cardsHtml}
       </div>
 
-      <div class="pill-empty" id="pillEmpty">
-        <div class="pill-empty-title">No results for this filter</div>
-        <div class="pill-empty-sub">None of your matched laptops were flagged as a strong fit for this specific workload within your budget. Select "All workloads" to see all matches, or go back and widen your budget.</div>
-      </div>
-
       <div class="p4-back-row">
-        <a class="btn-back-outline" href="${filtersUrl}">&#8592; Adjust Preferences</a>
+        <a class="btn-back-outline btn-editprefs" href="${filtersUrl}">&#8592; Edit preferences</a>
+        <a class="btn-startover" href="/workloads?reset=1">Start over</a>
       </div>
 
     </div>`;
