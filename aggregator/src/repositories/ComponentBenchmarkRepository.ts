@@ -95,4 +95,28 @@ export class ComponentBenchmarkRepository {
     `;
     return result.map((row: any) => this.normalizeRow(row));
   }
+
+  /**
+   * Get example components that meet (or exceed) a minimum benchmark score.
+   * Returns the lowest-scoring matches first (closest to the minimum).
+   */
+  async findExamplesByMinScore(params: {
+    type: "CPU" | "GPU";
+    minScore: number;
+    limit?: number;
+  }): Promise<ComponentBenchmark[]> {
+    const limit = Math.max(1, Math.min(10, params.limit ?? 3));
+
+    const result = await db`
+      SELECT *
+      FROM component_benchmarks
+      WHERE component_type = ${params.type}
+        AND benchmark_score IS NOT NULL
+        AND benchmark_score >= ${params.minScore}
+      ORDER BY benchmark_score ASC
+      LIMIT ${limit};
+    `;
+
+    return result.map((row: any) => this.normalizeRow(row));
+  }
 }

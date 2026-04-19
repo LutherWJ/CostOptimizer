@@ -1,6 +1,7 @@
 import type { Context } from "hono";
 import { OllamaService } from "../../../aggregator/src/extractors/OllamaService";
 import { KnowledgeRepository } from "../../../aggregator/src/repositories/KnowledgeRepository";
+import { ComponentBenchmarkRepository } from "../../../aggregator/src/repositories/ComponentBenchmarkRepository";
 import {
   SoftwareRequirementsRepository,
   type SoftwareRequirementRow,
@@ -16,6 +17,7 @@ console.log(`[SupportChat] Loaded ${SUPPORT_BOT_VERSION}`);
 
 const ollama = new OllamaService();
 const knowledgeRepo = new KnowledgeRepository();
+const benchmarkRepo = new ComponentBenchmarkRepository();
 const softwareRepo = new SoftwareRequirementsRepository();
 const workloadRepo = new WorkloadRepository();
 
@@ -732,17 +734,74 @@ function formatMinSpecsForUser(specs: Record<string, any>): string {
   const cores = num(specs.cpu_cores);
   const minGpu = num(specs.min_gpu_score);
   const vram = num(specs.vram_gb);
+  const cpuExamples = Array.isArray(specs.cpu_examples) ? (specs.cpu_examples as unknown[]) : [];
+  const gpuExamples = Array.isArray(specs.gpu_examples) ? (specs.gpu_examples as unknown[]) : [];
+
+  const formatExamples = (xs: unknown[]): string | null => {
+    const names = xs
+      .map((x) => String(x || "").trim())
+      .filter(Boolean)
+      .slice(0, 2);
+    return names.length ? names.join(" / ") : null;
+  };
+
+  const cpuExampleText = formatExamples(cpuExamples);
+  const gpuExampleText = formatExamples(gpuExamples);
 
   if (ram != null && ram > 0) add("RAM", `${ram} GB`);
   if (storage != null && storage > 0) add("Storage", `${storage} GB`);
-  if (minCpu != null && minCpu > 0) add("CPU", `score ${minCpu}+`);
+  if (cpuExampleText) add("CPU (examples)", cpuExampleText);
+  else if (minCpu != null && minCpu > 0) add("CPU", `score ${minCpu}+`);
   if (cores != null && cores > 0) add("CPU cores", `${cores}+`);
-  add("GPU", specs.gpu_type || null);
-  if (minGpu != null && minGpu > 0) add("GPU score", `${minGpu}+`);
+
+  const gpuType = String(specs.gpu_type || "").trim();
+  if (gpuType) {
+    add("GPU", gpuExampleText ? `${gpuType} (e.g. ${gpuExampleText})` : gpuType);
+  } else if (gpuExampleText) {
+    add("GPU (examples)", gpuExampleText);
+  }
+
+  if (!gpuExampleText && minGpu != null && minGpu > 0) add("GPU score", `${minGpu}+`);
   if (vram != null && vram > 0) add("VRAM", `${vram} GB+`);
   add("OS", specs.os_requirement || null);
 
   return lines.join("\n");
+}
+
+async function enrichSpecsWithComponentExamples(specs: Record<string, any>): Promise<Record<string, any>> {
+  const out = { ...specs };
+
+  const num = (v: any): number | null => {
+    const n = typeof v === "number" ? v : Number(v);
+    return Number.isFinite(n) ? n : null;
+  };
+
+  const cpuMin = num(out.min_cpu_score);
+  const gpuMin = num(out.min_gpu_score);
+
+  if (cpuMin != null && cpuMin > 0) {
+    try {
+      const examples = await withDbRetry(() =>
+        benchmarkRepo.findExamplesByMinScore({ type: "CPU", minScore: cpuMin, limit: 2 }),
+      );
+      out.cpu_examples = uniqStrings(examples.map((e) => e.component_name)).slice(0, 2);
+    } catch {
+      // ignore
+    }
+  }
+
+  if (gpuMin != null && gpuMin > 0) {
+    try {
+      const examples = await withDbRetry(() =>
+        benchmarkRepo.findExamplesByMinScore({ type: "GPU", minScore: gpuMin, limit: 2 }),
+      );
+      out.gpu_examples = uniqStrings(examples.map((e) => e.component_name)).slice(0, 2);
+    } catch {
+      // ignore
+    }
+  }
+
+  return out;
 }
 
 function renderSoftwareNote(profile: SoftwareRequirementRow, workloads: WorkloadRequirement[]): string {
@@ -1349,8 +1408,13 @@ export async function supportChatController(c: Context) {
 
       if (selectedWorkloads.length > 0) {
         const specs = computeConservativeMinSpecs(selectedWorkloads);
-        const body = formatMinSpecsForUser(specs);
-        const answer = body ? `Safest minimum specs:\n${body}` : "I don't have minimum specs for that yet.";
+        const enriched = await enrichSpecsWithComponentExamples(specs);
+        const body = formatMinSpecsForUser(enriched);
+        const disclaimer =
+          "Note: minimum specs are the floor—bigger projects can still feel slow. If you can, aim above them.";
+        const answer = body
+          ? `Safest minimum specs:\n${body}\n\n${disclaimer}`
+          : "I don't have minimum specs for that yet.";
 
         return c.json(
           {
