@@ -667,6 +667,8 @@ function broadRecommendationClarifier(message: string): string {
 
 function computeConservativeMinSpecs(workloads: WorkloadRequirement[]): Record<string, any> {
   const out: Record<string, any> = {};
+  const cpuExamples: string[] = [];
+  const gpuExamples: string[] = [];
 
   const gpuRank = (v: string | undefined): number => {
     const x = (v || "").toLowerCase();
@@ -680,6 +682,24 @@ function computeConservativeMinSpecs(workloads: WorkloadRequirement[]): Record<s
     if (!Number.isFinite(n)) return;
     const prev = typeof out[key] === "number" ? out[key] : Number(out[key]);
     if (!Number.isFinite(prev) || n > prev) out[key] = n;
+  };
+
+  const addExamples = (arr: any, target: string[]) => {
+    if (!arr) return;
+    if (typeof arr === "string") {
+      try {
+        const parsed = JSON.parse(arr);
+        if (Array.isArray(parsed)) addExamples(parsed, target);
+      } catch {
+        // ignore
+      }
+      return;
+    }
+    if (!Array.isArray(arr)) return;
+    for (const v of arr) {
+      const s = String(v ?? "").trim();
+      if (s) target.push(s);
+    }
   };
 
   for (const w of workloads) {
@@ -710,8 +730,13 @@ function computeConservativeMinSpecs(workloads: WorkloadRequirement[]): Record<s
     else if (prevOs.toLowerCase() !== nextOs.toLowerCase()) {
       if (prevOs.toLowerCase() === "any") out.os_requirement = nextOs;
     }
+
+    addExamples(min.cpu_examples, cpuExamples);
+    addExamples(min.gpu_examples, gpuExamples);
   }
 
+  if (cpuExamples.length) out.cpu_examples = uniqStrings(cpuExamples).slice(0, 2);
+  if (gpuExamples.length) out.gpu_examples = uniqStrings(gpuExamples).slice(0, 2);
   return out;
 }
 
@@ -779,7 +804,10 @@ async function enrichSpecsWithComponentExamples(specs: Record<string, any>): Pro
   const cpuMin = num(out.min_cpu_score);
   const gpuMin = num(out.min_gpu_score);
 
-  if (cpuMin != null && cpuMin > 0) {
+  const hasCpuExamples = Array.isArray(out.cpu_examples) && out.cpu_examples.length > 0;
+  const hasGpuExamples = Array.isArray(out.gpu_examples) && out.gpu_examples.length > 0;
+
+  if (!hasCpuExamples && cpuMin != null && cpuMin > 0) {
     try {
       const examples = await withDbRetry(() =>
         benchmarkRepo.findExamplesByMinScore({ type: "CPU", minScore: cpuMin, limit: 2 }),
@@ -790,7 +818,7 @@ async function enrichSpecsWithComponentExamples(specs: Record<string, any>): Pro
     }
   }
 
-  if (gpuMin != null && gpuMin > 0) {
+  if (!hasGpuExamples && gpuMin != null && gpuMin > 0) {
     try {
       const examples = await withDbRetry(() =>
         benchmarkRepo.findExamplesByMinScore({ type: "GPU", minScore: gpuMin, limit: 2 }),
@@ -867,10 +895,21 @@ function workloadMinimumSpecsAnswer(params: {
   const lines: string[] = [];
   lines.push(`Minimum specs for ${params.workload.workload_name}:`);
 
+  const cpuExamples =
+    Array.isArray(minSpecs?.cpu_examples) && minSpecs.cpu_examples.length
+      ? (minSpecs.cpu_examples as unknown[]).map((x: any) => String(x || "").trim()).filter(Boolean).slice(0, 2)
+      : [];
+  const gpuExamples =
+    Array.isArray(minSpecs?.gpu_examples) && minSpecs.gpu_examples.length
+      ? (minSpecs.gpu_examples as unknown[]).map((x: any) => String(x || "").trim()).filter(Boolean).slice(0, 2)
+      : [];
+
   if (minSpecs?.ram_gb != null) lines.push(`- RAM: ${minSpecs.ram_gb} GB`);
   if (minSpecs?.storage_gb != null) lines.push(`- Storage: ${minSpecs.storage_gb} GB`);
   if (minSpecs?.cpu_cores != null) lines.push(`- CPU cores: ${minSpecs.cpu_cores}+`);
+  if (cpuExamples.length) lines.push(`- CPU (examples): ${cpuExamples.join(" / ")}`);
   if (minSpecs?.gpu_type) lines.push(`- GPU: ${minSpecs.gpu_type}`);
+  if (gpuExamples.length) lines.push(`- GPU (examples): ${gpuExamples.join(" / ")}`);
   if (minSpecs?.vram_gb != null) lines.push(`- VRAM: ${minSpecs.vram_gb} GB+`);
   if (minSpecs?.min_cpu_score != null) lines.push(`- Min CPU score: ${minSpecs.min_cpu_score}+`);
   if (minSpecs?.min_gpu_score != null) lines.push(`- Min GPU score: ${minSpecs.min_gpu_score}+`);
@@ -936,12 +975,32 @@ function isMacSoftwareOverviewQuestion(message: string): boolean {
 
 function combineWorkloadMinSpecs(workloads: WorkloadRequirement[]): any {
   const out: any = {};
+  const cpuExamples: string[] = [];
+  const gpuExamples: string[] = [];
 
   const maxNum = (key: string, value: any) => {
     if (value == null) return;
     const n = Number(value);
     if (!Number.isFinite(n)) return;
     out[key] = out[key] == null ? n : Math.max(Number(out[key]), n);
+  };
+
+  const addExamples = (arr: any, target: string[]) => {
+    if (!arr) return;
+    if (typeof arr === "string") {
+      try {
+        const parsed = JSON.parse(arr);
+        if (Array.isArray(parsed)) addExamples(parsed, target);
+      } catch {
+        // ignore
+      }
+      return;
+    }
+    if (!Array.isArray(arr)) return;
+    for (const v of arr) {
+      const s = String(v ?? "").trim();
+      if (s) target.push(s);
+    }
   };
 
   for (const workload of workloads) {
@@ -960,8 +1019,13 @@ function combineWorkloadMinSpecs(workloads: WorkloadRequirement[]): any {
     const gpuType = String(minSpecs?.gpu_type || "").toLowerCase();
     if (gpuType === "discrete") out.gpu_type = "discrete";
     if (!out.gpu_type && gpuType === "integrated") out.gpu_type = "integrated";
+
+    addExamples(minSpecs?.cpu_examples, cpuExamples);
+    addExamples(minSpecs?.gpu_examples, gpuExamples);
   }
 
+  if (cpuExamples.length) out.cpu_examples = uniqStrings(cpuExamples).slice(0, 2);
+  if (gpuExamples.length) out.gpu_examples = uniqStrings(gpuExamples).slice(0, 2);
   return out;
 }
 
