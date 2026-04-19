@@ -148,10 +148,10 @@ const main = async () => {
         
         // 1. Discover (Limit to 50 new items to prevent hanging)
         logger.info("Step 1: Discovering new laptops (Limit: 50)...");
-        const sinceYear = 2024;
+        const sinceYear = 2026;
         const sinceDate = new Date(`${sinceYear}-01-01`);
         const discoveryJob = new LaptopDiscoveryJob(icecat, skuRepo, lineRepo);
-        await discoveryJob.run(sinceDate, 50);
+        await discoveryJob.run(sinceDate, 500);
 
         // 2. Repair Data (Fix branding/Integrated GPUs)
         logger.info("Step 2: Repairing metadata...");

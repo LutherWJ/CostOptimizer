@@ -1,23 +1,34 @@
 import { Hono } from "hono";
 import { serveStatic } from "hono/bun";
-import { getHome } from "./controllers/homeController";
-import { workloadsController } from "./controllers/workloadsController";
-import { filtersController } from "./controllers/filtersController";
-import { getRecommendationsController } from "./controllers/recommendationController";
+import { HomeController } from "./controllers/homeController";
+import { WorkloadsController } from "./controllers/workloadsController";
+import { FiltersController } from "./controllers/filtersController";
+import { RecommendationController } from "./controllers/recommendationController";
+import { RecommendationService } from "./services/RecommendationService";
+import { RecommendationRepository } from "./repositories/RecommendationRepository";
 import { supportChatController } from "./controllers/supportChatController";
 import { logger } from "hono/logger";
 
 const app = new Hono();
 app.use("*", logger());
 
+// Dependency Injection Setup
+const recommendationRepo = new RecommendationRepository();
+const recommendationService = new RecommendationService(recommendationRepo);
+const recommendationController = new RecommendationController(recommendationService);
+
+const homeController = new HomeController();
+const workloadsController = new WorkloadsController();
+const filtersController = new FiltersController();
+
 const publicRoot = `${import.meta.dir}/..`;
 app.use("/public/*", serveStatic({ root: publicRoot }));
 app.use("/images/*", serveStatic({ root: import.meta.dir }));
 
-app.get("/", getHome);
-app.get("/workloads", workloadsController);
-app.get("/filters", filtersController);
-app.get("/recommend", getRecommendationsController);
+app.get("/", (c) => homeController.getHome(c));
+app.get("/workloads", (c) => workloadsController.getWorkloads(c));
+app.get("/filters", (c) => filtersController.getFilters(c));
+app.get("/recommend", (c) => recommendationController.getRecommendations(c));
 app.post("/api/support/chat", supportChatController);
 
 const server = {
