@@ -170,6 +170,7 @@ SELECT
     pl.manufacturer,
     pl.line_name,
     ls.sku_number,
+    ls.marketing_name,
     ls.hardware_specs,
     ls.qualitative_data,
     COALESCE(sa.workloads, '[]'::jsonb) as suitable_workloads,

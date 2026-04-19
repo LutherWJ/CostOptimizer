@@ -44,6 +44,7 @@ export interface LaptopRecommendation {
   sku_id: string;
   manufacturer: string;
   line_name: string;
+  marketing_name?: string;
   sku_number: string;
   hardware_specs: {
     cpu_family: string;

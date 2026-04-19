@@ -81,8 +81,11 @@ export class LaptopDiscoveryJob {
         // 3. Canonicalize Brand using Transformer
         const brandName = this.transformer.canonicalizeBrand(item.brand, specs);
 
-        // 4. Coordinate storage with Repositories
-        const lineId = await this.lineRepo.upsert(brandName, brandName);
+        // 4. Try to determine a useful product line name
+        const lineName = marketingName.split(" ")[0] || brandName;
+        
+        // 5. Coordinate storage with Repositories
+        const lineId = await this.lineRepo.upsert(brandName, lineName);
         await this.skuRepo.upsert(lineId, item.sku, validatedSpecs, null, marketingName);
         
         newItemsCount++;

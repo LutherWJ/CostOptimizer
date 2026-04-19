@@ -83,7 +83,13 @@ function renderCard(laptop: LaptopRecommendation, idx: number): string {
       <div class="rc-top">
         <div class="rc-title-block">
           <div class="rc-brand">${laptop.manufacturer}</div>
-          <div class="rc-name">${laptop.line_name}</div>
+          <div class="rc-name">${
+            laptop.marketing_name && laptop.marketing_name.toLowerCase() !== laptop.manufacturer.toLowerCase()
+              ? laptop.marketing_name
+              : (laptop.line_name && laptop.line_name.toLowerCase() !== laptop.manufacturer.toLowerCase()
+                  ? laptop.line_name
+                  : laptop.sku_number)
+          }</div>
           <div class="rc-tagline">${specs.cpu_family} &middot; ${gpu}</div>
         </div>
         ${isBest ? `<div class="best-badge">Best match</div>` : ""}

@@ -49,7 +49,7 @@ export class PriceSyncJob {
       const cpuScore = sku.cpu_benchmark_score || 2000;
       const gpuScore = sku.gpu_benchmark_score || 0;
       
-      const basePrice = 300 + (ram * 5) + (storage * 0.10) + (cpuScore * 0.05) + (gpuScore * 0.10);
+      const basePrice = 300 + (ram * 5) + (storage * 0.10) + (cpuScore * 0.03) + (gpuScore * 0.05);
       
       // Apply Brand Tax
       const brandKey = brand.toLowerCase();
