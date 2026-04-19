@@ -66,6 +66,7 @@ const Base = (content: string, title = "App", extraCss: string[] = [], extraJs: 
     </div>
   </div>
 
+  <script src="/public/nav.js"></script>
   ${extraScripts}
   <script src="/public/chat.js"></script>
 </body>

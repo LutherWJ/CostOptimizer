@@ -29,6 +29,20 @@ nav{
 .nav-restart{background:var(--white);border:1.5px solid var(--border);color:var(--ink);padding:8px 16px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;transition:all .2s;text-decoration:none;display:inline-block;}
 .nav-restart:hover{color:var(--teal);border-color:var(--teal);}
 
+/* Nav arrows + page label */
+.nav-pager{display:inline-flex;align-items:center;gap:10px;}
+.nav-page-label{font-size:12px;font-weight:700;color:var(--ink);letter-spacing:-.2px;white-space:nowrap;}
+.nav-arrow{
+  width:34px;height:34px;border-radius:50%;
+  border:1px solid rgba(13,17,23,.12);
+  background:var(--ink);color:var(--cream);
+  display:grid;place-items:center;
+  cursor:pointer;transition:all .15s;
+}
+.nav-arrow svg{width:16px;height:16px;stroke:currentColor;stroke-width:2.4;fill:none;stroke-linecap:round;stroke-linejoin:round;}
+.nav-arrow:hover{background:var(--white);color:var(--ink);border-color:rgba(13,17,23,.25);}
+.nav-arrow:disabled{opacity:.35;cursor:not-allowed;}
+
 @media(max-width:900px){nav{padding:0 20px;}}
 @media(max-width:480px){nav{padding:0 14px;}.nav-btn{padding:8px 14px;font-size:12px;}}
 

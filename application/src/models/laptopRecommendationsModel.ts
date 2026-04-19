@@ -28,3 +28,4 @@ export interface LaptopRecommendation {
   gpu_score: number | null;
   value_score: number | null;
 }
+

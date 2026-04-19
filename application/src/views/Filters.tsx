@@ -7,10 +7,14 @@ const Filters = () => {
         <span class="nav-dot"></span>LapTop
       </a>
       <div class="nav-right">
-        <div class="nav-steps">
-          <div class="step-dot done">1</div>
-          <div class="step-line done"></div>
-          <div class="step-dot active">2</div>
+        <div class="nav-pager" aria-label="Page navigation">
+          <button class="nav-arrow" type="button" data-dir="prev" data-href="/workloads" aria-label="Back">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>
+          </button>
+          <div class="nav-page-label">Filters</div>
+          <button class="nav-arrow" type="button" data-dir="next" data-action="findLaptops" aria-label="Next">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>
+          </button>
         </div>
       </div>
     </nav>
@@ -22,7 +26,7 @@ const Filters = () => {
         <h2>Filter?</h2>
 
         <div class="section-heading">Budget range</div>
-        <div class="preset-row">
+        <div class="preset-row" id="budgetPresets">
           <div class="preset sel" data-value="any"    onclick="selectPreset(this)">No limit</div>
           <div class="preset"     data-value="0-600"  onclick="selectPreset(this)">Under $600</div>
           <div class="preset"     data-value="600-1000"   onclick="selectPreset(this)">$600&ndash;$1k</div>
@@ -31,22 +35,22 @@ const Filters = () => {
           <div class="preset"     data-value="2500-99999" onclick="selectPreset(this)">$2.5k+</div>
         </div>
 
-        <div class="section-heading">Software compatibility</div>
-        <div class="sw-grid">
-          <div class="swopt" data-key="examsoft" onclick="toggleSoftware(this)">ExamSoft</div>
-          <div class="swopt" data-key="respondus" onclick="toggleSoftware(this)">Respondus</div>
-          <div class="swopt" data-key="m365" onclick="toggleSoftware(this)">Microsoft 365</div>
-          <div class="swopt" data-key="solidworks" onclick="toggleSoftware(this)">SolidWorks</div>
-          <div class="swopt" data-key="autocad" onclick="toggleSoftware(this)">AutoCAD</div>
-          <div class="swopt" data-key="revit" onclick="toggleSoftware(this)">Revit</div>
-          <div class="swopt" data-key="arcgispro" onclick="toggleSoftware(this)">ArcGIS Pro</div>
-          <div class="swopt" data-key="matlab" onclick="toggleSoftware(this)">MATLAB</div>
-          <div class="swopt" data-key="adobecc" onclick="toggleSoftware(this)">Adobe CC</div>
-          <div class="swopt" data-key="docker" onclick="toggleSoftware(this)">Docker</div>
+        <div class="nudge-row" id="budgetNudgeRow">
+          <div class="nudge-head">
+            <div class="nudge-title">Budget nudge</div>
+            <div class="nudge-sub">Widen your ceiling in +10% steps.</div>
+          </div>
+          <div class="nudge-ctl" aria-label="Budget nudge control">
+            <button class="nudge-btn" type="button" id="nudgeMinus" aria-label="Decrease nudge">&minus;</button>
+            <div class="nudge-dots" id="nudgeDots" aria-label="Nudge steps"></div>
+            <button class="nudge-btn" type="button" id="nudgePlus" aria-label="Increase nudge">+</button>
+            <div class="nudge-pct" id="nudgePct">+0%</div>
+          </div>
+          <div class="nudge-ceiling" id="nudgeCeiling"></div>
         </div>
 
         <div class="section-heading">Screen size</div>
-        <div class="size-grid">
+        <div class="size-grid" id="sizeCards">
           <div class="size-card sel" data-value="any" onclick="selectSize(this)">
             <span class="s-ico">&#x1F4D0;</span>
             <div class="s-title">Any Size</div>
