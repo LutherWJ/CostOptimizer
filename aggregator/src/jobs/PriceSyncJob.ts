@@ -60,7 +60,7 @@ export class PriceSyncJob {
       const numListings = Math.floor(Math.random() * 5) + 1;
       
       // Shuffle vendors to pick random ones
-      const shuffledVendors = [...VENDORS].sort(() => 0.5 - Math.random());
+      const shuffledVendors = VENDORS.slice().sort(() => 0.5 - Math.random());
       const selectedVendors = shuffledVendors.slice(0, numListings);
 
       logger.info(`Generating ${numListings} prices for ${brand} ${sku.sku_number}...`);

@@ -29,7 +29,7 @@ export function extractId(result: any[], context: string): string {
 export function normalizeRow<T>(row: any, jsonbFields: string[]): T {
   if (!row) return row;
   
-  const normalized = { ...row };
+  const normalized = Object.assign({}, row);
   
   for (const field of jsonbFields) {
     if (typeof normalized[field] === "string" && normalized[field] !== null) {

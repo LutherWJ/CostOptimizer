@@ -51,7 +51,9 @@ export class NotebookcheckExtractor implements IBenchmarkProvider {
         });
 
         logger.info(`Successfully extracted ${benchmarks.length} ${componentType} benchmarks from ${url}`);
-        allResults.push(...benchmarks);
+        for (const b of benchmarks) {
+          allResults.push(b);
+        }
       },
     });
 

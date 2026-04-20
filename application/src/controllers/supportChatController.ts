@@ -828,7 +828,7 @@ function formatMinSpecsForUser(
 }
 
 async function enrichSpecsWithComponentExamples(specs: Record<string, any>): Promise<Record<string, any>> {
-  const out = { ...specs };
+  const out = Object.assign({}, specs);
 
   const num = (v: any): number | null => {
     const n = typeof v === "number" ? v : Number(v);
@@ -932,7 +932,9 @@ function renderSoftwareNote(profile: SoftwareRequirementRow, workloads: Workload
     blocks.push(`Workload: ${w.workload_name}`);
     if (minSpecLines.length) {
       blocks.push("Minimum specs:");
-      blocks.push(...minSpecLines);
+      for (const line of minSpecLines) {
+        blocks.push(line);
+      }
     }
   }
 

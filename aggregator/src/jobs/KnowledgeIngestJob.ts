@@ -15,7 +15,10 @@ async function listFilesRecursive(dir: string): Promise<string[]> {
   for (const entry of entries) {
     const fullPath = join(dir, entry.name);
     if (entry.isDirectory()) {
-      out.push(...(await listFilesRecursive(fullPath)));
+      const subFiles = await listFilesRecursive(fullPath);
+      for (const file of subFiles) {
+        out.push(file);
+      }
     } else if (entry.isFile()) {
       out.push(fullPath);
     }

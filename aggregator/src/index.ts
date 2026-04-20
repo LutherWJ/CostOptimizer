@@ -147,7 +147,7 @@ const main = async () => {
         logger.info("Starting weekly maintenance...");
         
         // 1. Discover (Limit to 50 new items to prevent hanging)
-        logger.info("Step 1: Discovering new laptops (Limit: 50)...");
+        logger.info("Step 1: Discovering new laptops (Limit: 500)...");
         const sinceYear = 2026;
         const sinceDate = new Date(`${sinceYear}-01-01`);
         const discoveryJob = new LaptopDiscoveryJob(icecat, skuRepo, lineRepo);

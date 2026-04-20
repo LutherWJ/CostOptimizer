@@ -18,7 +18,7 @@ export class RepairJob {
 
     for (const sku of skus) {
       let needsUpdate = false;
-      const specs = { ...sku.hardware_specs };
+      const specs = Object.assign({}, sku.hardware_specs);
       
       // 1. Repair Reseller Brands
       const productLine = await this.lineRepo.findById(sku.product_line_id);

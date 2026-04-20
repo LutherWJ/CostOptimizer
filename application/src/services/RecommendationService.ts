@@ -126,12 +126,11 @@ export class RecommendationService {
       battery_hours: rawSpecs.battery_wh ? Math.round(rawSpecs.battery_wh / 10) : 8,
     };
 
-    return {
-      ...row,
+    return Object.assign({}, row, {
       hardware_specs,
       suitable_workloads: parseMaybeJson<string[]>(row.suitable_workloads) || [],
       compatible_software_keys: parseMaybeJson<string[]>((row as any).compatible_software_keys),
       compatible_software_names: parseMaybeJson<string[]>((row as any).compatible_software_names),
-    };
+    });
   }
 }

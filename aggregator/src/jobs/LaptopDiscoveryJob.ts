@@ -23,12 +23,17 @@ export class LaptopDiscoveryJob {
     logger.info(`Starting Laptop Discovery Job (Since: ${sinceDate.getFullYear()}, Limit: ${limit || 'None'})...`);
     
     // Calculate absolute minimum requirements from workload definitions
-    const minRamRequired = Math.min(...WORKLOAD_DEFINITIONS.map(w => w.min_specs.ram_gb));
+    const minRamRequired = WORKLOAD_DEFINITIONS
+      .map(w => w.min_specs.ram_gb)
+      .reduce((min, val) => Math.min(min, val), Infinity);
+
     // Filter out 0 or undefined storage requirements before finding the minimum
     const storageSpecs = WORKLOAD_DEFINITIONS
       .map(w => w.min_specs.storage_gb)
       .filter((s): s is number => !!s && s > 0);
-    const minStorageRequired = storageSpecs.length > 0 ? Math.min(...storageSpecs) : 128; // Default to 128GB floor
+    const minStorageRequired = storageSpecs.length > 0 
+      ? storageSpecs.reduce((min, val) => Math.min(min, val), Infinity) 
+      : 128; // Default to 128GB floor
     
     logger.info(`Quality Filter Active: RAM >= ${minRamRequired}GB, Storage >= ${minStorageRequired}GB`);
 
