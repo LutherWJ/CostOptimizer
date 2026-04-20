@@ -7,7 +7,15 @@ const Home = () => {
         <span class="nav-dot"></span>LapTop
       </a>
       <div class="nav-right">
-        <a class="nav-btn" href="/workloads">Find My LapTop &rarr;</a>
+        <div class="nav-pager" aria-label="Page navigation">
+          <button class="nav-arrow" type="button" data-dir="prev" disabled aria-disabled="true" aria-label="Back">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>
+          </button>
+          <div class="nav-page-label">Home</div>
+          <button class="nav-arrow" type="button" data-dir="next" data-href="/workloads" aria-label="Next">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>
+          </button>
+        </div>
       </div>
     </nav>
 

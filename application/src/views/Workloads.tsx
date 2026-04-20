@@ -7,10 +7,14 @@ const Workloads = () => {
         <span class="nav-dot"></span>LapTop
       </a>
       <div class="nav-right">
-        <div class="nav-steps">
-          <div class="step-dot active">1</div>
-          <div class="step-line"></div>
-          <div class="step-dot">2</div>
+        <div class="nav-pager" aria-label="Page navigation">
+          <button class="nav-arrow" type="button" data-dir="prev" data-href="/" aria-label="Back">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>
+          </button>
+          <div class="nav-page-label">Workloads</div>
+          <button class="nav-arrow" type="button" data-dir="next" data-action="goToFilters" disabled aria-disabled="true" aria-label="Next">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>
+          </button>
         </div>
       </div>
     </nav>

@@ -47,6 +47,7 @@ export class RecommendationService {
     workloads?: string;
     software?: string;
     budget?: string;
+    budgetNudgeSteps?: number; // 0-5, each step widens max by +10% (disabled for "any" and "$2.5k+")
     size?: string;
   }): Promise<LaptopRecommendation[]> {
     // Build workload name list
@@ -69,6 +70,23 @@ export class RecommendationService {
       const [lo, hi] = params.budget.split("-").map(Number);
       if (!isNaN(lo)) minPrice = lo;
       if (!isNaN(hi)) maxPrice = hi;
+    }
+
+    // Optional max widening ("nudge"): +10% per step, up to +50%.
+    // Hidden/disabled for "No limit" and "$2.5k+" (effectively unlimited max).
+    const rawSteps = Number.isFinite(params.budgetNudgeSteps as number)
+      ? Math.trunc(params.budgetNudgeSteps as number)
+      : 0;
+    const steps = Math.max(0, Math.min(5, rawSteps));
+    const nudgeEnabled =
+      steps > 0 &&
+      params.budget &&
+      params.budget !== "any" &&
+      params.budget !== "2500-99999" &&
+      maxPrice !== null &&
+      maxPrice < 99999;
+    if (nudgeEnabled && maxPrice !== null) {
+      maxPrice = Math.round(maxPrice * (1 + steps * 0.1));
     }
 
     // Build size bounds
